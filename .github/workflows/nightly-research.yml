@@ -17,6 +17,7 @@ env:
 
 jobs:
   plan:
+    if: github.event_name == 'workflow_dispatch' || vars.ADSF_ENABLE_GITHUB_SCHEDULE == 'true'
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.plan.outputs.should_run }}

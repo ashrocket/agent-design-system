@@ -59,7 +59,12 @@ key, records the reserved charge and pushes only the ledger/result envelope to
 `automation/research-state`. That branch backs an open pull request, so research
 never changes the default branch without human review.
 
-Repository setup requires one `OPENAI_API_KEY` Actions secret and workflow
-permissions allowing the GitHub token to create pull requests. A scheduled run
-is not proven operational until the workflow, state-branch commit, and pull
-request are observed on the remote repository.
+The GitHub cron is fail-closed by default so publishing this repository cannot
+silently create a second budget ledger alongside a local scheduler. To use
+GitHub as the one nightly runner, first disable any local scheduler, add an
+`OPENAI_API_KEY` Actions secret, set the repository variable
+`ADSF_ENABLE_GITHUB_SCHEDULE` to `true`, and allow the GitHub token to create
+pull requests. Manual workflow dispatch remains available without the variable.
+
+A scheduled GitHub run is not proven operational until the workflow,
+state-branch commit, and pull request are observed on the remote repository.

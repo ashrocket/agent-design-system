@@ -33,6 +33,6 @@ Uninstall reversibly:
 The uninstaller stops the job and moves its plist to Trash. It preserves the
 research ledger, results, logs, and project checkout.
 
-Do not enable both the local scheduler and the GitHub workflow unless they use a
-shared authoritative ledger. Separate checkouts cannot see each other's
-reservations and could both spend budget.
+Do not set `ADSF_ENABLE_GITHUB_SCHEDULE=true` while this local scheduler is
+loaded unless both runners use a shared authoritative ledger. Separate
+checkouts cannot see each other's reservations and could both spend budget.
