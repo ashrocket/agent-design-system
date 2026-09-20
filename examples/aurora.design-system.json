@@ -1,0 +1,143 @@
+{
+  "$schema": "../src/agent_design_system/schemas/design-system.schema.json",
+  "format": "adsf",
+  "version": "0.1.0",
+  "name": "Aurora example system",
+  "description": "A deliberately small example showing tokens and deterministic enforcement decisions.",
+  "tokens": {
+    "color": {
+      "text": {
+        "primary": {
+          "$type": "color",
+          "$value": "#1e293b",
+          "$description": "Primary text on light surfaces."
+        }
+      },
+      "action": {
+        "primary": {
+          "$type": "color",
+          "$value": "#2563eb",
+          "$description": "Primary interactive action."
+        }
+      },
+      "surface": {
+        "canvas": {
+          "$type": "color",
+          "$value": "#f8fafc",
+          "$description": "Default page surface."
+        }
+      }
+    },
+    "space": {
+      "3": {
+        "$type": "dimension",
+        "$value": 12,
+        "$description": "Compact inset spacing in pixels."
+      },
+      "4": {
+        "$type": "dimension",
+        "$value": 16,
+        "$description": "Default control inset spacing in pixels."
+      }
+    },
+    "radius": {
+      "md": {
+        "$type": "dimension",
+        "$value": 8,
+        "$description": "Default control corner radius in pixels."
+      }
+    }
+  },
+  "rules": [
+    {
+      "id": "foreground-color-token",
+      "description": "Component foreground colors must reference a color token.",
+      "rationale": "Token references preserve themeability and make intent explicit to tools and agents.",
+      "selector": "$.components.*.style.color",
+      "assert": { "operator": "token-reference", "category": "color" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "color" },
+          "action": {
+            "type": "coerce",
+            "strategy": "nearest-token",
+            "category": "color",
+            "message": "Replace the literal foreground color with the nearest declared color token."
+          }
+        },
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "reject", "message": "Foreground color is not a known token or coercible color." }
+        }
+      ]
+    },
+    {
+      "id": "background-color-token",
+      "description": "Component backgrounds must reference a color token.",
+      "rationale": "Semantic color tokens allow safe theme changes.",
+      "selector": "$.components.*.style.background",
+      "assert": { "operator": "token-reference", "category": "color" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "color" },
+          "action": { "type": "coerce", "strategy": "nearest-token", "category": "color" }
+        },
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report" }
+        }
+      ]
+    },
+    {
+      "id": "spacing-token",
+      "description": "Component padding must reference a spacing token.",
+      "rationale": "A shared spacing scale prevents one-off layout values.",
+      "selector": "$.components.*.style.padding",
+      "assert": { "operator": "token-reference", "category": "space" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "space" },
+          "action": { "type": "coerce", "strategy": "nearest-token", "category": "space" }
+        },
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report" }
+        }
+      ]
+    },
+    {
+      "id": "accessible-name-present",
+      "description": "Interactive components must declare an accessible name property.",
+      "rationale": "Selecting the component allows the rule to detect a missing nested property.",
+      "selector": "$.components.*",
+      "assert": { "operator": "property-exists", "value": "accessibility.name" },
+      "severity": "warning",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report", "message": "Declare accessibility.name for this component." }
+        }
+      ]
+    },
+    {
+      "id": "accessible-name",
+      "description": "Interactive components must have a non-empty accessible name.",
+      "rationale": "A visible or programmatic name is required for meaningful assistive-technology output.",
+      "selector": "$.components.*.accessibility.name",
+      "assert": { "operator": "pattern", "value": "\\S" },
+      "severity": "warning",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report", "message": "Provide a meaningful accessible name; this cannot be inferred safely." }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "license": "Apache-2.0"
+  }
+}

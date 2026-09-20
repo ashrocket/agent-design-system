@@ -1,0 +1,145 @@
+name: Nightly format research
+
+on:
+  schedule:
+    - cron: "17 03 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-format-research
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  STATE_BRANCH: automation/research-state
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.plan.outputs.should_run }}
+      run_id: ${{ steps.plan.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Restore public budget ledger
+        run: |
+          if git fetch origin "$STATE_BRANCH:refs/remotes/origin/$STATE_BRANCH"; then
+            git show "refs/remotes/origin/$STATE_BRANCH:research/ledger.jsonl" > research/ledger.jsonl || true
+          fi
+      - name: Apply budget gates and choose a question
+        id: plan
+        run: >-
+          python -m agent_design_system research plan
+          --out .research/plan.json
+          --prompt-out .research/prompt.md
+          --github-output "$GITHUB_OUTPUT"
+        env:
+          PYTHONPATH: src
+      - name: Stage schema for the agent
+        if: steps.plan.outputs.should_run == 'true'
+        run: cp src/agent_design_system/schemas/research-result.schema.json .research/result.schema.json
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.should_run == 'true'
+        with:
+          name: research-plan-${{ steps.plan.outputs.run_id }}
+          path: .research/
+          if-no-files-found: error
+          retention-days: 7
+
+  research:
+    needs: plan
+    if: needs.plan.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      final_message: ${{ steps.codex.outputs.final-message }}
+      action_outcome: ${{ steps.codex.outcome }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v5
+        with:
+          name: research-plan-${{ needs.plan.outputs.run_id }}
+          path: .research
+      - name: Run read-only Codex research
+        id: codex
+        continue-on-error: true
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .research/prompt.md
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          effort: low
+          codex-args: '["--ephemeral", "--config", "model_verbosity=\"low\"", "--output-schema", ".research/result.schema.json"]'
+
+  publish:
+    needs: [plan, research]
+    if: always() && needs.plan.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      CODEX_RESULT: ${{ needs.research.outputs.final_message }}
+      CODEX_OUTCOME: ${{ needs.research.outputs.action_outcome }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Restore or create the public state branch
+        run: |
+          if git fetch origin "$STATE_BRANCH:refs/remotes/origin/$STATE_BRANCH"; then
+            git switch --create "$STATE_BRANCH" --track "refs/remotes/origin/$STATE_BRANCH"
+            git merge --no-edit "$GITHUB_SHA"
+          else
+            git switch --create "$STATE_BRANCH"
+          fi
+      - uses: actions/download-artifact@v5
+        with:
+          name: research-plan-${{ needs.plan.outputs.run_id }}
+          path: .research
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Record result and reserved charge
+        run: >-
+          python -m agent_design_system research record
+          --plan .research/plan.json
+          --result-env CODEX_RESULT
+          --status "${CODEX_OUTCOME:-failed}"
+        env:
+          PYTHONPATH: src
+      - name: Publish auditable state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/ledger.jsonl research/results/
+          if git diff --cached --quiet; then
+            echo "Run was already recorded; nothing to commit."
+          else
+            git commit -m "research: record ${{ needs.plan.outputs.run_id }}"
+            git push origin "$STATE_BRANCH"
+          fi
+      - name: Open review pull request when needed
+        run: |
+          if [ "$(gh pr list --head "$STATE_BRANCH" --state open --json number --jq length)" = "0" ]; then
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "$STATE_BRANCH" \
+              --title "Nightly ADSF research findings" \
+              --body "Budgeted, machine-recorded research findings. Review proposals before merging; the agent never edits the format directly."
+          fi

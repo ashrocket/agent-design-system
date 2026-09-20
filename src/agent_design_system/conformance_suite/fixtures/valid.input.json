@@ -1,0 +1,11 @@
+{
+  "sample": {
+    "literalColor": "{color.base}",
+    "tieSpace": "{space.zz}",
+    "label": "Continue",
+    "variant": "solid",
+    "legacy": false,
+    "density": "compact",
+    "aliasColor": "{color.alias}"
+  }
+}

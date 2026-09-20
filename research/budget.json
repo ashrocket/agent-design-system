@@ -1,0 +1,10 @@
+{
+  "version": "0.1.0",
+  "timezone": "UTC",
+  "accounting": "tokens",
+  "daily_tokens": 12000,
+  "weekly_tokens": 70000,
+  "monthly_tokens": 280000,
+  "max_runs_per_day": 1,
+  "policy": "Charge the greater of the reservation or measured usage for every attempted run."
+}

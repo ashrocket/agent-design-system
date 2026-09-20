@@ -1,0 +1,29 @@
+{
+  "charged_tokens": 9000,
+  "error": "research result missing required property: run_id",
+  "finished_at": "2026-09-20T14:31:32.735925Z",
+  "plan": {
+    "budget_before": {
+      "daily": 0,
+      "monthly": 0,
+      "weekly": 0
+    },
+    "budget_limits": {
+      "daily": 12000,
+      "monthly": 280000,
+      "weekly": 70000
+    },
+    "decision": "run",
+    "format": "adsf-research-plan",
+    "planned_at": "2026-09-20T14:31:32.563091Z",
+    "question": "Find the single most consequential ambiguity an implementation agent would encounter when reading the current ADSF format. Show the exact conflicting or underspecified paths, then propose the smallest testable clarification.",
+    "question_id": "agent-ambiguity-audit",
+    "reserved_tokens": 9000,
+    "run_id": "20260920T143132Z-071bd996",
+    "version": "0.1.0"
+  },
+  "raw_result": "{\"error\": \"WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)\\nError: failed to initialize in-process app-server client: Operation not permitted (os error 1)\\n\"}",
+  "result": null,
+  "status": "failed",
+  "usage": null
+}

@@ -1,0 +1,197 @@
+{
+  "$schema": "../schemas/conformance-manifest.schema.json",
+  "format": "adsf-conformance-suite",
+  "version": "0.1.0",
+  "description": "Normative ADSF 0.1 behavior vectors for independent enforcement tools.",
+  "cases": [
+    {
+      "id": "valid-document",
+      "operation": "enforce",
+      "system": "fixtures/conformance.design-system.json",
+      "document": "fixtures/valid.input.json",
+      "apply_fixes": false,
+      "expected": {
+        "changed": false,
+        "violations": [],
+        "fails": {
+          "info": false,
+          "warning": false,
+          "error": false,
+          "never": false
+        }
+      }
+    },
+    {
+      "id": "all-decisions-and-coercions",
+      "operation": "enforce",
+      "system": "fixtures/conformance.design-system.json",
+      "document": "fixtures/all-decisions.input.json",
+      "apply_fixes": true,
+      "expected": {
+        "changed": true,
+        "violations": [
+          {
+            "rule_id": "literal-color",
+            "path": "$.sample.literalColor",
+            "severity": "error",
+            "disposition": "coerce",
+            "replacement": "{color.alias}"
+          },
+          {
+            "rule_id": "tie-space",
+            "path": "$.sample.tieSpace",
+            "severity": "error",
+            "disposition": "coerce",
+            "replacement": "{space.aa}"
+          },
+          {
+            "rule_id": "accessible-name",
+            "path": "$.sample.label",
+            "severity": "warning",
+            "disposition": "report"
+          },
+          {
+            "rule_id": "known-variant",
+            "path": "$.sample.variant",
+            "severity": "info",
+            "disposition": "reject"
+          },
+          {
+            "rule_id": "legacy-exception",
+            "path": "$.sample.legacy",
+            "severity": "error",
+            "disposition": "ignore"
+          },
+          {
+            "rule_id": "compact-density",
+            "path": "$.sample.density",
+            "severity": "warning",
+            "disposition": "coerce",
+            "replacement": "compact"
+          }
+        ],
+        "fails": {
+          "info": true,
+          "warning": true,
+          "error": true,
+          "never": true
+        },
+        "document": {
+          "sample": {
+            "literalColor": "{color.alias}",
+            "tieSpace": "{space.aa}",
+            "label": "",
+            "variant": "ghost",
+            "legacy": true,
+            "density": "compact",
+            "aliasColor": "{color.alias}"
+          }
+        }
+      }
+    },
+    {
+      "id": "ignored-violation-is-logged",
+      "operation": "enforce",
+      "system": "fixtures/conformance.design-system.json",
+      "document": "fixtures/ignore-only.input.json",
+      "apply_fixes": false,
+      "expected": {
+        "changed": false,
+        "violations": [
+          {
+            "rule_id": "legacy-exception",
+            "path": "$.sample.legacy",
+            "severity": "error",
+            "disposition": "ignore"
+          }
+        ],
+        "fails": {
+          "info": false,
+          "warning": false,
+          "error": false,
+          "never": false
+        }
+      }
+    },
+    {
+      "id": "missing-property-is-reported",
+      "operation": "enforce",
+      "system": "fixtures/conformance.design-system.json",
+      "document": "fixtures/missing-property.input.json",
+      "apply_fixes": false,
+      "expected": {
+        "changed": false,
+        "violations": [
+          {
+            "rule_id": "label-present",
+            "path": "$.sample",
+            "severity": "error",
+            "disposition": "report"
+          }
+        ],
+        "fails": {
+          "info": true,
+          "warning": true,
+          "error": true,
+          "never": false
+        }
+      }
+    },
+    {
+      "id": "report-obeys-threshold",
+      "operation": "enforce",
+      "system": "fixtures/conformance.design-system.json",
+      "document": "fixtures/report-only.input.json",
+      "apply_fixes": false,
+      "expected": {
+        "changed": false,
+        "violations": [
+          {
+            "rule_id": "accessible-name",
+            "path": "$.sample.label",
+            "severity": "warning",
+            "disposition": "report"
+          }
+        ],
+        "fails": {
+          "info": true,
+          "warning": true,
+          "error": false,
+          "never": false
+        }
+      }
+    },
+    {
+      "id": "reject-always-fails",
+      "operation": "enforce",
+      "system": "fixtures/conformance.design-system.json",
+      "document": "fixtures/reject-only.input.json",
+      "apply_fixes": false,
+      "expected": {
+        "changed": false,
+        "violations": [
+          {
+            "rule_id": "known-variant",
+            "path": "$.sample.variant",
+            "severity": "info",
+            "disposition": "reject"
+          }
+        ],
+        "fails": {
+          "info": true,
+          "warning": true,
+          "error": true,
+          "never": true
+        }
+      }
+    },
+    {
+      "id": "root-coercion-is-invalid",
+      "operation": "validate",
+      "system": "fixtures/invalid-root-coercion.design-system.json",
+      "expected": {
+        "valid": false
+      }
+    }
+  ]
+}

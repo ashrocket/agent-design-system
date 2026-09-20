@@ -1,0 +1,31 @@
+{
+  "format": "adsf",
+  "version": "0.1.0",
+  "name": "Invalid root coercion",
+  "description": "A semantic-invalid system used by the normative validation vector.",
+  "tokens": {
+    "string": {
+      "fallback": {
+        "$type": "string",
+        "$value": "fixed",
+        "$description": "Replacement value."
+      }
+    }
+  },
+  "rules": [
+    {
+      "id": "root-coercion",
+      "description": "Attempts to replace the entire document.",
+      "rationale": "ADSF 0.1 forbids root coercion.",
+      "selector": "$",
+      "assert": { "operator": "type", "value": "string" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "coerce", "strategy": "replace", "value": "fixed" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "sample": {
+    "literalColor": "#010101",
+    "tieSpace": 6,
+    "label": "",
+    "variant": "ghost",
+    "legacy": true,
+    "density": "spacious",
+    "aliasColor": "{color.alias}"
+  }
+}

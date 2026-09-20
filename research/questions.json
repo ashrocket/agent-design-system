@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0",
+  "questions": [
+    {
+      "id": "agent-ambiguity-audit",
+      "prompt": "Find the single most consequential ambiguity an implementation agent would encounter when reading the current ADSF format. Show the exact conflicting or underspecified paths, then propose the smallest testable clarification.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 4,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "enforcement-parity-audit",
+      "prompt": "Compare the public JSON Schema, runtime validator, rule evaluator, examples, and documentation. Identify semantic drift that could make two conforming tools disagree, and propose executable conformance cases.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 4,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "decision-safety-audit",
+      "prompt": "Audit report, coerce, reject, and ignore decisions for determinism and data-loss risk. Find cases where coercion should be forbidden or where a fallback is ambiguous, with repository evidence.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 4,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "tool-builder-audit",
+      "prompt": "Approach ADSF as an agent implementing a new independent enforcer. Identify missing normative details, unstable assumptions, or fixtures needed to reach byte-for-byte compatible decisions.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 4,
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "interoperability-audit",
+      "prompt": "Assess where the current ADSF token and rule structures can interoperate cleanly with common design-token and static-analysis conventions, using only evidence available in the repository. Separate proven compatibility from hypotheses requiring external research.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 4,
+      "priority": 10,
+      "enabled": true
+    }
+  ]
+}

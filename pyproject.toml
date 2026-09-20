@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-design-system"
+version = "0.1.0"
+description = "An agent-readable design-system format, deterministic enforcer, and budgeted research harness"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Agent Design System contributors" }]
+keywords = ["design-system", "agents", "lint", "design-tokens", "accessibility"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "jsonschema>=4.18,<5",
+  "mypy>=1.11,<2",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+adsys = "agent_design_system.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agent_design_system = [
+  "schemas/*.json",
+  "conformance_suite/*.json",
+  "conformance_suite/fixtures/*.json",
+]

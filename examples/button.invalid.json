@@ -1,0 +1,15 @@
+{
+  "components": {
+    "primaryButton": {
+      "style": {
+        "color": "#202a3c",
+        "background": "#2865e8",
+        "padding": 15,
+        "radius": "{radius.md}"
+      },
+      "accessibility": {
+        "name": ""
+      }
+    }
+  }
+}

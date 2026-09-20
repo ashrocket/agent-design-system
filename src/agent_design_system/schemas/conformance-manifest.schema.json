@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adsf:schema:conformance-manifest:0.1.0",
+  "title": "ADSF conformance suite manifest",
+  "type": "object",
+  "required": ["format", "version", "description", "cases"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": "adsf-conformance-suite" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "description": { "type": "string", "minLength": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "case": {
+      "type": "object",
+      "required": ["id", "operation", "system", "expected"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "operation": { "enum": ["validate", "enforce"] },
+        "system": { "type": "string", "minLength": 1 },
+        "document": { "type": "string", "minLength": 1 },
+        "apply_fixes": { "type": "boolean" },
+        "expected": { "type": "object" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "operation": { "const": "enforce" } }, "required": ["operation"] },
+          "then": {
+            "required": ["document"],
+            "properties": { "expected": { "$ref": "#/$defs/enforceExpected" } }
+          }
+        },
+        {
+          "if": { "properties": { "operation": { "const": "validate" } }, "required": ["operation"] },
+          "then": {
+            "properties": { "expected": { "$ref": "#/$defs/validateExpected" } }
+          }
+        }
+      ]
+    },
+    "validateExpected": {
+      "type": "object",
+      "required": ["valid"],
+      "properties": { "valid": { "type": "boolean" } },
+      "additionalProperties": false
+    },
+    "enforceExpected": {
+      "type": "object",
+      "required": ["changed", "violations", "fails"],
+      "properties": {
+        "changed": { "type": "boolean" },
+        "violations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/violation" }
+        },
+        "fails": {
+          "type": "object",
+          "required": ["info", "warning", "error", "never"],
+          "properties": {
+            "info": { "type": "boolean" },
+            "warning": { "type": "boolean" },
+            "error": { "type": "boolean" },
+            "never": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "document": {}
+      },
+      "additionalProperties": false
+    },
+    "violation": {
+      "type": "object",
+      "required": ["rule_id", "path", "severity", "disposition"],
+      "properties": {
+        "rule_id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^\\$" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "disposition": { "enum": ["report", "coerce", "reject", "ignore"] },
+        "replacement": {}
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "components": {
+    "primaryButton": {
+      "style": {
+        "color": "{color.text.primary}",
+        "background": "{color.action.primary}",
+        "padding": "{space.4}",
+        "radius": "{radius.md}"
+      },
+      "accessibility": {
+        "name": "Continue"
+      }
+    }
+  }
+}

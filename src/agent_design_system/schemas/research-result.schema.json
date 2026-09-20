@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adsf:schema:research-result:0.1.0",
+  "title": "Agent Design System nightly research result",
+  "type": "object",
+  "required": ["run_id", "question_id", "summary", "evidence", "proposals", "risks"],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "question_id": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 1200 },
+    "evidence": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["path", "claim"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "claim": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "proposals": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["title", "rationale", "compatibility", "changes"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 },
+          "compatibility": { "enum": ["backwards-compatible", "breaking", "research-only"] },
+          "changes": {
+            "type": "array",
+            "maxItems": 6,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 6,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "recommended_next_question": { "type": "string" }
+  },
+  "additionalProperties": false
+}

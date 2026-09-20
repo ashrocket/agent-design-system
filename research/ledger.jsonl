@@ -1,0 +1,1 @@
+{"actual_tokens": null, "charged_tokens": 9000, "finished_at": "2026-09-20T14:31:32.735925Z", "question_id": "agent-ambiguity-audit", "reserved_tokens": 9000, "result_path": "research/results/20260920T143132Z-071bd996.json", "run_id": "20260920T143132Z-071bd996", "started_at": "2026-09-20T14:31:32.563091Z", "status": "failed"}

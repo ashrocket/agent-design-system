@@ -1,0 +1,160 @@
+{
+  "$schema": "../../schemas/design-system.schema.json",
+  "format": "adsf",
+  "version": "0.1.0",
+  "name": "ADSF normative conformance system",
+  "description": "Exercises every ADSF 0.1 disposition and deterministic coercion strategy.",
+  "tokens": {
+    "color": {
+      "base": {
+        "$type": "color",
+        "$value": "#000000",
+        "$description": "Black reference color."
+      },
+      "alias": {
+        "$type": "color",
+        "$value": "{color.base}",
+        "$description": "Alias used to prove references resolve."
+      },
+      "action": {
+        "$type": "color",
+        "$value": "#3366ff",
+        "$description": "Blue action color."
+      }
+    },
+    "space": {
+      "aa": {
+        "$type": "dimension",
+        "$value": 4,
+        "$description": "Lexically first spacing token."
+      },
+      "zz": {
+        "$type": "dimension",
+        "$value": 8,
+        "$description": "Lexically last spacing token."
+      }
+    }
+  },
+  "rules": [
+    {
+      "id": "literal-color",
+      "description": "Literal colors use the nearest declared color token.",
+      "rationale": "This vector proves deterministic color distance.",
+      "selector": "$.sample.literalColor",
+      "assert": { "operator": "token-reference", "category": "color" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "color" },
+          "action": { "type": "coerce", "strategy": "nearest-token", "category": "color" }
+        },
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "reject" }
+        }
+      ]
+    },
+    {
+      "id": "tie-space",
+      "description": "Equidistant numbers choose the lexically first token path.",
+      "rationale": "Tie-breaking must match across implementations.",
+      "selector": "$.sample.tieSpace",
+      "assert": { "operator": "token-reference", "category": "space" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "space" },
+          "action": { "type": "coerce", "strategy": "nearest-token", "category": "space" }
+        },
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report" }
+        }
+      ]
+    },
+    {
+      "id": "label-present",
+      "description": "The sample must declare a label property.",
+      "rationale": "Parent selection plus property-exists detects absent fields.",
+      "selector": "$.sample",
+      "assert": { "operator": "property-exists", "value": "label" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report" }
+        }
+      ]
+    },
+    {
+      "id": "accessible-name",
+      "description": "Accessible names contain a non-whitespace character.",
+      "rationale": "A missing name requires human input rather than coercion.",
+      "selector": "$.sample.label",
+      "assert": { "operator": "pattern", "value": "\\S" },
+      "severity": "warning",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report" }
+        }
+      ]
+    },
+    {
+      "id": "known-variant",
+      "description": "Variants must be declared.",
+      "rationale": "Unknown variants are unsafe at every failure threshold.",
+      "selector": "$.sample.variant",
+      "assert": { "operator": "enum", "values": ["solid"] },
+      "severity": "info",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "reject" }
+        }
+      ]
+    },
+    {
+      "id": "legacy-exception",
+      "description": "Legacy true is an explicit logged exception.",
+      "rationale": "Ignored violations remain observable but do not fail.",
+      "selector": "$.sample.legacy",
+      "assert": { "operator": "equals", "value": false },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "ignore" }
+        }
+      ]
+    },
+    {
+      "id": "compact-density",
+      "description": "Density is coerced to compact.",
+      "rationale": "This vector proves literal replacement.",
+      "selector": "$.sample.density",
+      "assert": { "operator": "equals", "value": "compact" },
+      "severity": "warning",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "coerce", "strategy": "replace", "value": "compact" }
+        }
+      ]
+    },
+    {
+      "id": "valid-alias-reference",
+      "description": "An existing color alias is a valid token reference.",
+      "rationale": "Token references are validated by path before resolving their value.",
+      "selector": "$.sample.aliasColor",
+      "assert": { "operator": "token-reference", "category": "color" },
+      "severity": "error",
+      "decision": [
+        {
+          "when": { "operator": "always" },
+          "action": { "type": "report" }
+        }
+      ]
+    }
+  ]
+}
