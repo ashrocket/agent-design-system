@@ -5,7 +5,6 @@ from typing import Any
 
 from .model import EnforcementResult
 
-
 SEVERITY_LEVEL = {"never": 99, "error": 3, "warning": 2, "info": 1}
 
 

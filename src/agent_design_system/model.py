@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-
 Severity = Literal["info", "warning", "error"]
 Disposition = Literal["report", "coerce", "reject", "ignore"]
 

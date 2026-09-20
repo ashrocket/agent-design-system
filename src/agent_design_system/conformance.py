@@ -8,7 +8,6 @@ from .enforce import enforce
 from .format import FormatError, load_json, validate_design_system
 from .reporters import should_fail
 
-
 THRESHOLDS = ("info", "warning", "error", "never")
 
 

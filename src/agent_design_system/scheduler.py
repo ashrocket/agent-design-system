@@ -6,7 +6,6 @@ from pathlib import Path
 
 from .format import FormatError
 
-
 LAUNCH_AGENT_LABEL = "dev.adsf.nightly-research"
 
 

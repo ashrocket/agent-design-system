@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 import copy
+import json
 import unittest
 from pathlib import Path
 
 from agent_design_system.enforce import enforce
 from agent_design_system.reporters import render_sarif, should_fail
-
 
 ROOT = Path(__file__).resolve().parents[1]
 

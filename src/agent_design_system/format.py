@@ -8,7 +8,6 @@ from typing import Any
 from .model import Token
 from .selectors import SelectorError, parse_selector
 
-
 TOKEN_REFERENCE = re.compile(r"^\{([a-zA-Z0-9_.-]+)\}$")
 ALLOWED_ASSERTIONS = {
     "token-reference",

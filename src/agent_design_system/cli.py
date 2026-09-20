@@ -25,7 +25,6 @@ from .research import (
 )
 from .scheduler import render_macos_launch_agent, write_macos_launch_agent
 
-
 DEFAULT_CONFORMANCE_MANIFEST = (
     Path(__file__).resolve().parent / "conformance_suite" / "manifest.json"
 )

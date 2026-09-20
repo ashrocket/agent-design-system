@@ -11,7 +11,6 @@ import jsonschema
 from agent_design_system.conformance import run_suite
 from agent_design_system.format import FormatError
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SUITE = ROOT / "src/agent_design_system/conformance_suite"
 
