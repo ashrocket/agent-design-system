@@ -155,8 +155,15 @@ is evidence of a reference, not proof that a browser loaded it.
 Each static HTML page must reference the generated token stylesheet. Static
 HTML inspection rejects inline style attributes and tags, `<base>` URL
 rebasing, duplicate attributes, presentation
-attributes, scripts/event handlers, embedded SVG, and external or uninspected
-stylesheet references. A project with any uninspected source or asset exits
+attributes, scripts/event handlers, embedded SVG, inert `<template>` or
+`<noscript>` content, and external or uninspected
+stylesheet references. It also checks every static `class` token against nonempty,
+simple top-level `.class` rules in CSS directly linked by that page. A selector in a
+comment, conditional group, complex selector or unrelated stylesheet does not
+count as a base rule. Alternate, disabled, media-qualified, titled or typed
+stylesheet links cannot establish loading and fail the gate. This is static
+linkage evidence, not proof of browser loading, computed styles, or selector
+matching at runtime. A project with any uninspected source or asset exits
 nonzero until an adapter is added or a reviewed exclusion is declared. The gate
 remains offline and read-only; invalid manifests or unsafe paths exit 2, while
 source drift, token mismatch, and unverified coverage exit 1. CSS and HTML

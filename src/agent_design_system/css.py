@@ -28,6 +28,9 @@ REFERENCE = re.compile(r"var\([ \t\r\n\f]*(--[a-zA-Z_][a-zA-Z0-9_-]*)[ \t\r\n\f]
 GROUPS = {"media", "supports", "layer", "container", "scope", "keyframes"}
 CSS_SPACE = " \t\r\n\f"
 LENGTH_UNITS = {"px", "em", "rem", "ex", "ch", "vw", "vh", "vmin", "vmax", "%"}
+SIMPLE_CLASS_LIST = re.compile(
+    r"\.[a-zA-Z_][a-zA-Z0-9_-]*(?:[ \t\r\n\f]*,[ \t\r\n\f]*\.[a-zA-Z_][a-zA-Z0-9_-]*)*"
+)
 
 
 def _has_priority(value: str) -> bool:
@@ -279,7 +282,9 @@ def _mask_comments(text: str) -> str:
     return "".join(chars)
 
 
-def parse_css(text: str) -> list[Declaration]:
+def parse_css(
+    text: str, *, selector_classes: set[str] | None = None
+) -> list[Declaration]:
     """Parse ordinary rules and grouping at-rules. Reject every unsupported form."""
     masked = _mask_comments(text)
     declarations: list[Declaration] = []
@@ -345,7 +350,17 @@ def parse_css(text: str) -> list[Declaration]:
                     raise _error(text, position, "unsupported at-rule")
                 position = rules(end + 1, nested=True, depth=depth + 1)
             else:
+                start_count = len(declarations)
                 position = block(end + 1)
+                if (
+                    selector_classes is not None
+                    and depth == 0
+                    and len(declarations) > start_count
+                    and SIMPLE_CLASS_LIST.fullmatch(prelude)
+                ):
+                    selector_classes.update(
+                        selector.strip(CSS_SPACE)[1:] for selector in prelude.split(",")
+                    )
 
     def block(position: int) -> int:
         while True:
@@ -475,7 +490,8 @@ def enforce_css(
     apply_fixes: bool = False,
 ) -> EnforcementResult:
     policy = load_css_policy(system)
-    declarations = parse_css(text)
+    selector_classes: set[str] = set()
+    declarations = parse_css(text, selector_classes=selector_classes)
     violations: list[Violation] = []
     fixes: list[tuple[int, int, str]] = []
     governed = 0
@@ -548,6 +564,7 @@ def enforce_css(
             "declarations": len(declarations),
             "governed": governed,
             "unrestricted": unrestricted,
+            "selector_classes": sorted(selector_classes),
         },
         contract_sha256=policy.sha256,
     )

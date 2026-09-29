@@ -34,7 +34,13 @@ class CSSTests(unittest.TestCase):
         self.assertFalse(result.violations)
         self.assertEqual(
             result.coverage,
-            {"adapter": "css", "declarations": 7, "governed": 5, "unrestricted": 2},
+            {
+                "adapter": "css",
+                "declarations": 7,
+                "governed": 5,
+                "unrestricted": 2,
+                "selector_classes": ["primary-button"],
+            },
         )
         self.assertIn("7 CSS declaration", render_text(result))
 
@@ -177,6 +183,20 @@ class CSSTests(unittest.TestCase):
         result = enforce_css(self.system, source)
         self.assertFalse(result.violations)
         self.assertEqual(result.coverage["declarations"], 2)
+
+    def test_only_simple_unconditional_class_selectors_are_indexed(self) -> None:
+        source = """/* .comment { color: red; } */
+.alpha, .beta { color: var(--color-text-primary); }
+.empty { }
+.hover:hover { color: var(--color-text-primary); }
+.other:not(.negative) { color: var(--color-text-primary); }
+:is(.other, .fragment, .third) { color: var(--color-text-primary); }
+@supports selector(.conditional) { .conditional { color: var(--color-text-primary); } }
+@media screen { .responsive { color: var(--color-text-primary); } }
+"""
+        result = enforce_css(self.system, source)
+        self.assertFalse(result.violations)
+        self.assertEqual(result.coverage["selector_classes"], ["alpha", "beta"])
 
     def test_comments_strings_and_newlines_survive_exact_fixes(self) -> None:
         source = '/* untouched */\r\n.x { content: "a;{}:/*not-comment*/"; color: /* before */ #1E293B /* after */; padding: 12.0PX 16px; }\r\n'

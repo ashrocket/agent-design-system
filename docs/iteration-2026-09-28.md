@@ -149,3 +149,33 @@ exclusions and policy pins are still required. The next useful adapter should
 inspect a real application source format such as TSX with a parser, rather
 than trying to infer it from suffixes or string matching. No whole-app or
 browser-computed-style compliance is claimed from this checkpoint.
+
+## Fourth iteration: connect markup classes to inspected CSS
+
+The panel found that an adapter accepting `className` by string alone would be
+misleading: the class might appear only in a comment, a negative selector, a
+conditional rule, or an unrelated stylesheet. The existing static HTML gate
+also had this gap. CSS enforcement now indexes only nonempty, simple top-level
+class rules from parsed rule preludes. Each HTML page checks its static `class`
+tokens against that page's directly linked, inspected CSS. Conditional or
+alternate stylesheet links cannot establish that connection. The passing
+fixture's three classes have matching base rules; an unknown utility class or
+an otherwise valid rule in an unlinked stylesheet fails.
+
+This index is a prerequisite for a parser-backed TSX adapter. The panel found
+that a useful TSX PASS also needs a closed import graph, a validated application
+entrypoint and a restrictive syntax profile; the current HTML gate rejects
+module scripts. Static class linkage therefore does not yet establish React
+application coverage. Even for HTML, it proves a declared connection, not that
+the browser loaded a stylesheet or applied the rule at runtime.
+An independent source review moved the token link into `<template>` and
+`<noscript>` and reproduced a false pass. Both inert or conditional containers
+now reject, with regressions, so their links cannot certify a page.
+The same reviewer found that an empty class rule could count as a base rule;
+the index now requires a declaration in that rule. Independent rechecks found
+no remaining concrete false pass within the stated static CSS/HTML profile.
+The final local checkpoint passed 105 unit tests, nine normative cases, both
+source-workflow verifiers, Ruff, mypy, and the required example
+validate/check/fix/recheck sequence. The invalid example exits nonzero before
+repair and retains only its accessibility warning after repair. No remote CI
+run or browser-rendered result is claimed.

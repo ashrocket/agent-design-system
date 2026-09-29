@@ -117,6 +117,8 @@ class _HTMLCoverage(HTMLParser):
         self.source = source
         self.issues = issues
         self.stylesheets: list[str] = []
+        self.usable_stylesheets: list[str] = []
+        self.classes: list[tuple[str, str, int]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         seen: set[str] = set()
@@ -130,6 +132,9 @@ class _HTMLCoverage(HTMLParser):
                 )
             seen.add(name)
         attributes = dict(attrs)
+        for token in re.split(r"[ \t\r\n\f]+", attributes.get("class") or ""):
+            if token:
+                self.classes.append((token, tag, self.getpos()[0]))
         if tag in {
             "base",
             "style",
@@ -139,6 +144,8 @@ class _HTMLCoverage(HTMLParser):
             "object",
             "embed",
             "font",
+            "template",
+            "noscript",
         }:
             _issue(
                 self.issues,
@@ -159,11 +166,23 @@ class _HTMLCoverage(HTMLParser):
                     "html-unverified-attribute",
                     f"{name} is an uninspected styling or execution surface",
                 )
-        if (
-            tag == "link"
-            and "stylesheet" in (attributes.get("rel") or "").lower().split()
-        ):
-            self.stylesheets.append(attributes.get("href") or "")
+        if tag == "link":
+            rel = (attributes.get("rel") or "").lower().split()
+            if "stylesheet" in rel:
+                href = attributes.get("href") or ""
+                self.stylesheets.append(href)
+                if rel != ["stylesheet"] or any(
+                    name in attributes
+                    for name in ("media", "disabled", "title", "type")
+                ):
+                    _issue(
+                        self.issues,
+                        self.source,
+                        "stylesheet-conditional",
+                        "alternate, conditional, disabled, titled, or typed stylesheet link cannot prove loading",
+                    )
+                else:
+                    self.usable_stylesheets.append(href)
 
     handle_startendtag = handle_starttag
 
@@ -392,16 +411,25 @@ def check_project(
 
     scan(root)
     inspected = {item["path"] for item in files}
+    classes_by_path = {
+        item["path"]: set(item["coverage"]["selector_classes"]) for item in files
+    }
     html_sources: list[dict[str, Any]] = []
     for name, source, digest in html:
         parser = _HTMLCoverage(name, issues)
         parser.feed(source)
         parser.close()
         referenced_tokens = False
+        linked_classes: set[str] = set()
         html_sources.append(
-            {"path": name, "sha256": digest, "stylesheets": list(parser.stylesheets)}
+            {
+                "path": name,
+                "sha256": digest,
+                "stylesheets": list(parser.stylesheets),
+                "classes": sorted({token for token, _, _ in parser.classes}),
+            }
         )
-        for href in parser.stylesheets:
+        for href in parser.usable_stylesheets:
             parsed = urlsplit(href)
             if (
                 not href
@@ -439,6 +467,15 @@ def check_project(
                     name,
                     "stylesheet-unverified",
                     f"stylesheet was not inspected: {href}",
+                )
+            linked_classes.update(classes_by_path.get(target_name, set()))
+        for token, tag, line in parser.classes:
+            if token not in linked_classes:
+                _issue(
+                    issues,
+                    name,
+                    "html-class-unverified",
+                    f"class {token!r} on <{tag}> at line {line} has no simple base rule in linked, inspected CSS",
                 )
         if not referenced_tokens:
             _issue(

@@ -66,6 +66,10 @@ class ProjectTests(unittest.TestCase):
             ["tokens.css", "layout.css", "components/button.css"],
         )
         self.assertEqual(len(first["coverage"]["html_sources"][0]["sha256"]), 64)
+        self.assertEqual(
+            first["coverage"]["html_sources"][0]["classes"],
+            ["card", "primary-button", "stage"],
+        )
         self.assertEqual(first["files"], second["files"])
         self.assertEqual(
             before,
@@ -89,6 +93,86 @@ class ProjectTests(unittest.TestCase):
         )
         self.assertIn("css-color", [item["code"] for item in report["issues"]])
         self.assertEqual(path.read_bytes(), before)
+
+    def test_html_classes_need_simple_rules_in_linked_inspected_css(self) -> None:
+        index = self.app / "index.html"
+        original = index.read_text()
+        index.write_text(original.replace('class="stage"', 'class="stage rogue"'))
+        before = index.read_bytes()
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertIn(
+            "html-class-unverified", [item["code"] for item in report["issues"]]
+        )
+        self.assertTrue(any("rogue" in item["message"] for item in report["issues"]))
+        self.assertEqual(index.read_bytes(), before)
+
+        (self.app / "orphan.css").write_text(
+            ".orphan { color: var(--color-text-primary); }"
+        )
+        index.write_text(original.replace('class="stage"', 'class="orphan"'))
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("orphan" in item["message"] for item in report["issues"]))
+
+        index.write_text(original.replace('class="stage"', 'class="&#x73;tage"'))
+        self.assertEqual(self.report()["status"], "pass")
+
+        (self.app / "orphan.css").write_text(
+            ".empty { } .other { color: var(--color-text-primary); }"
+        )
+        index.write_text(
+            original.replace(
+                'href="layout.css"',
+                'href="layout.css"><link rel="stylesheet" href="orphan.css"',
+            ).replace('class="stage"', 'class="empty"')
+        )
+        self.assertTrue(
+            any(
+                item["code"] == "html-class-unverified"
+                for item in self.report()["issues"]
+            )
+        )
+
+    def test_conditional_stylesheet_links_do_not_prove_class_or_token_loading(
+        self,
+    ) -> None:
+        index = self.app / "index.html"
+        original = index.read_text()
+        for attribute in ('media="print"', "disabled", 'rel="alternate stylesheet"'):
+            with self.subTest(attribute=attribute):
+                if attribute.startswith("rel="):
+                    changed = original.replace(
+                        'rel="stylesheet" href="tokens.css"',
+                        'rel="alternate stylesheet" href="tokens.css"',
+                    )
+                else:
+                    changed = original.replace(
+                        'href="tokens.css"', f'href="tokens.css" {attribute}'
+                    )
+                index.write_text(changed)
+                codes = {item["code"] for item in self.report()["issues"]}
+                self.assertIn("stylesheet-conditional", codes)
+                self.assertIn("tokens-unreferenced", codes)
+
+    def test_inert_template_and_noscript_links_cannot_pass(self) -> None:
+        index = self.app / "index.html"
+        original = index.read_text()
+        for tag in ("template", "noscript"):
+            with self.subTest(tag=tag):
+                moved = original.replace(
+                    '  <link rel="stylesheet" href="tokens.css">\n', ""
+                ).replace(
+                    "</body>",
+                    f'<{tag}><link rel="stylesheet" href="tokens.css"></{tag}></body>',
+                )
+                index.write_text(moved)
+                report = self.report()
+                self.assertEqual(report["status"], "fail")
+                self.assertIn(
+                    "html-unverified-element",
+                    [item["code"] for item in report["issues"]],
+                )
 
     def test_unknown_formats_and_assets_fail_with_hashed_inventory(self) -> None:
         samples = {

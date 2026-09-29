@@ -49,6 +49,11 @@ def main() -> None:
         "layout.css",
     ]
     assert report["coverage"]["governed_declarations"] == 11
+    assert report["coverage"]["html_sources"][0]["classes"] == [
+        "card",
+        "primary-button",
+        "stage",
+    ]
     context_run = subprocess.run(
         [
             sys.executable,
@@ -126,6 +131,15 @@ def main() -> None:
         second.unlink()
 
         index = app / "index.html"
+        original_index = index.read_text()
+        index.write_text(
+            original_index.replace('class="stage"', 'class="unapproved-utility"')
+        )
+        assert any(
+            issue["code"] == "html-class-unverified"
+            for issue in check(manifest, expected=1)["issues"]
+        )
+        index.write_text(original_index)
         index.write_text(
             index.read_text().replace(
                 "</body>", '<p style="color:red">drift</p></body>'
@@ -149,7 +163,7 @@ def main() -> None:
             for issue in check(manifest, expected=1)["issues"]
         )
     print(
-        "PASS project CSS workflow: full discovery, pinned contract, token parity, inline and unsupported coverage, and unchanged source"
+        "PASS project CSS workflow: full discovery, pinned contract, token parity, linked class coverage, inline and unsupported coverage, and unchanged source"
     )
 
 
