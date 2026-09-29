@@ -54,11 +54,18 @@
       "description": "Component foreground colors must reference a color token.",
       "rationale": "Token references preserve themeability and make intent explicit to tools and agents.",
       "selector": "$.components.*.style.color",
-      "assert": { "operator": "token-reference", "category": "color" },
+      "assert": {
+        "operator": "token-reference",
+        "category": "color"
+      },
       "severity": "error",
       "decision": [
         {
-          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "color" },
+          "when": {
+            "operator": "coercible",
+            "strategy": "nearest-token",
+            "category": "color"
+          },
           "action": {
             "type": "coerce",
             "strategy": "nearest-token",
@@ -67,8 +74,13 @@
           }
         },
         {
-          "when": { "operator": "always" },
-          "action": { "type": "reject", "message": "Foreground color is not a known token or coercible color." }
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "reject",
+            "message": "Foreground color is not a known token or coercible color."
+          }
         }
       ]
     },
@@ -77,16 +89,31 @@
       "description": "Component backgrounds must reference a color token.",
       "rationale": "Semantic color tokens allow safe theme changes.",
       "selector": "$.components.*.style.background",
-      "assert": { "operator": "token-reference", "category": "color" },
+      "assert": {
+        "operator": "token-reference",
+        "category": "color"
+      },
       "severity": "error",
       "decision": [
         {
-          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "color" },
-          "action": { "type": "coerce", "strategy": "nearest-token", "category": "color" }
+          "when": {
+            "operator": "coercible",
+            "strategy": "nearest-token",
+            "category": "color"
+          },
+          "action": {
+            "type": "coerce",
+            "strategy": "nearest-token",
+            "category": "color"
+          }
         },
         {
-          "when": { "operator": "always" },
-          "action": { "type": "report" }
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "report"
+          }
         }
       ]
     },
@@ -95,16 +122,31 @@
       "description": "Component padding must reference a spacing token.",
       "rationale": "A shared spacing scale prevents one-off layout values.",
       "selector": "$.components.*.style.padding",
-      "assert": { "operator": "token-reference", "category": "space" },
+      "assert": {
+        "operator": "token-reference",
+        "category": "space"
+      },
       "severity": "error",
       "decision": [
         {
-          "when": { "operator": "coercible", "strategy": "nearest-token", "category": "space" },
-          "action": { "type": "coerce", "strategy": "nearest-token", "category": "space" }
+          "when": {
+            "operator": "coercible",
+            "strategy": "nearest-token",
+            "category": "space"
+          },
+          "action": {
+            "type": "coerce",
+            "strategy": "nearest-token",
+            "category": "space"
+          }
         },
         {
-          "when": { "operator": "always" },
-          "action": { "type": "report" }
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "report"
+          }
         }
       ]
     },
@@ -113,12 +155,20 @@
       "description": "Interactive components must declare an accessible name property.",
       "rationale": "Selecting the component allows the rule to detect a missing nested property.",
       "selector": "$.components.*",
-      "assert": { "operator": "property-exists", "value": "accessibility.name" },
+      "assert": {
+        "operator": "property-exists",
+        "value": "accessibility.name"
+      },
       "severity": "warning",
       "decision": [
         {
-          "when": { "operator": "always" },
-          "action": { "type": "report", "message": "Declare accessibility.name for this component." }
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "report",
+            "message": "Declare accessibility.name for this component."
+          }
         }
       ]
     },
@@ -127,17 +177,121 @@
       "description": "Interactive components must have a non-empty accessible name.",
       "rationale": "A visible or programmatic name is required for meaningful assistive-technology output.",
       "selector": "$.components.*.accessibility.name",
-      "assert": { "operator": "pattern", "value": "\\S" },
+      "assert": {
+        "operator": "pattern",
+        "value": "\\S"
+      },
       "severity": "warning",
       "decision": [
         {
-          "when": { "operator": "always" },
-          "action": { "type": "report", "message": "Provide a meaningful accessible name; this cannot be inferred safely." }
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "report",
+            "message": "Provide a meaningful accessible name; this cannot be inferred safely."
+          }
         }
       ]
     }
   ],
   "metadata": {
     "license": "Apache-2.0"
+  },
+  "extensions": {
+    "css": {
+      "version": "0.1.0",
+      "bindings": {
+        "color.text.primary": "--color-text-primary",
+        "color.action.primary": "--color-action-primary",
+        "color.surface.canvas": "--color-surface-canvas",
+        "space.3": "--space-3",
+        "space.4": "--space-4",
+        "radius.md": "--radius-md"
+      },
+      "properties": {
+        "color": {
+          "tokens": [
+            "color.text.primary"
+          ]
+        },
+        "background-color": {
+          "tokens": [
+            "color.action.primary",
+            "color.surface.canvas"
+          ]
+        },
+        "background": {
+          "tokens": [
+            "color.action.primary",
+            "color.surface.canvas"
+          ]
+        },
+        "padding": {
+          "tokens": [
+            "space.3",
+            "space.4"
+          ],
+          "max_values": 4,
+          "literals": [
+            "0"
+          ]
+        },
+        "padding-inline": {
+          "tokens": [
+            "space.3",
+            "space.4"
+          ],
+          "max_values": 2,
+          "literals": [
+            "0"
+          ]
+        },
+        "padding-block": {
+          "tokens": [
+            "space.3",
+            "space.4"
+          ],
+          "max_values": 2,
+          "literals": [
+            "0"
+          ]
+        },
+        "gap": {
+          "tokens": [
+            "space.3",
+            "space.4"
+          ],
+          "max_values": 2
+        },
+        "border-radius": {
+          "tokens": [
+            "radius.md"
+          ],
+          "max_values": 4,
+          "literals": [
+            "0"
+          ]
+        },
+        "margin": {
+          "tokens": [
+            "space.3",
+            "space.4"
+          ],
+          "max_values": 4,
+          "literals": [
+            "0",
+            "auto"
+          ]
+        }
+      },
+      "unrestricted_properties": [
+        "display",
+        "align-items",
+        "justify-content",
+        "cursor",
+        "content"
+      ]
+    }
   }
 }

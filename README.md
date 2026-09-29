@@ -6,6 +6,13 @@ and decision trees. The reference `adsys` CLI can report violations, propose or
 apply safe coercions, reject unsafe values, emit SARIF, and keep an append-only
 audit log—without calling a model.
 
+The practical goal is to keep coding assistants inside the design system. Export
+the approved contract with `adsys context`, generate its CSS variables with
+`adsys tokens`, and check authored styles using `adsys check --input-format css`.
+The source gate catches literal values, unapproved tokens and local variable
+overrides in inspected CSS. See [the assistant workflow](docs/assistant-enforcement.md)
+for the contract, repair loop and source-coverage limits.
+
 The repository also includes an optional, budget-gated nightly research harness.
 It asks one small question about the format, records evidence and proposals for
 human review, and refuses to start when daily, weekly, or monthly token

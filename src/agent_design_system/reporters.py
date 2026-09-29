@@ -20,8 +20,11 @@ def should_fail(result: EnforcementResult, threshold: str) -> bool:
 
 
 def render_text(result: EnforcementResult) -> str:
+    coverage = ""
+    if result.coverage is not None:
+        coverage = f"; inspected {result.coverage['declarations']} CSS declaration(s), {result.coverage['governed']} governed"
     if not result.violations:
-        return f"PASS {result.source}: no design-system violations"
+        return f"PASS {result.source}: no design-system violations{coverage}"
     lines = [
         f"FOUND {result.source}: {len(result.violations)} violation(s) "
         f"({result.counts['error']} error, {result.counts['warning']} warning, {result.counts['info']} info)"
@@ -30,10 +33,17 @@ def render_text(result: EnforcementResult) -> str:
         suffix = ""
         if violation.disposition == "coerce":
             suffix = f" -> {json.dumps(violation.replacement, ensure_ascii=False)}"
+        location = (
+            f"{result.source}:{violation.line}:{violation.column}"
+            if violation.line is not None
+            else violation.path
+        )
         lines.append(
-            f"{violation.severity.upper():7} {violation.rule_id} {violation.path}: "
+            f"{violation.severity.upper():7} {violation.rule_id} {location}: "
             f"{violation.message} [{violation.disposition}]{suffix}"
         )
+    if coverage:
+        lines.append(coverage.lstrip("; "))
     return "\n".join(lines)
 
 
@@ -49,6 +59,12 @@ def render_sarif(result: EnforcementResult) -> str:
         level = {"error": "error", "warning": "warning", "info": "note"}[
             violation.severity
         ]
+        physical: dict[str, Any] = {"artifactLocation": {"uri": result.source}}
+        if violation.line is not None and violation.column is not None:
+            physical["region"] = {
+                "startLine": violation.line,
+                "startColumn": violation.column,
+            }
         sarif_results.append(
             {
                 "ruleId": violation.rule_id,
@@ -56,9 +72,7 @@ def render_sarif(result: EnforcementResult) -> str:
                 "message": {"text": violation.message},
                 "locations": [
                     {
-                        "physicalLocation": {
-                            "artifactLocation": {"uri": result.source}
-                        },
+                        "physicalLocation": physical,
                         "logicalLocations": [
                             {"fullyQualifiedName": violation.path, "kind": "property"}
                         ],
@@ -76,6 +90,7 @@ def render_sarif(result: EnforcementResult) -> str:
         "version": "2.1.0",
         "runs": [
             {
+                "columnKind": "unicodeCodePoints",
                 "tool": {
                     "driver": {
                         "name": "adsys",

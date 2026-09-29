@@ -120,7 +120,7 @@ def resolve_token_value(
     return value
 
 
-def validate_design_system(system: Any) -> list[str]:
+def validate_design_system(system: Any, *, css: bool = True) -> list[str]:
     errors: list[str] = []
     if not isinstance(system, dict):
         return ["document root must be an object"]
@@ -285,6 +285,13 @@ def validate_design_system(system: Any) -> list[str]:
                 or final_when.get("operator") != "always"
             ):
                 errors.append(f"{prefix}.decision must end with an always fallback")
+    if css and not errors and "css" in system.get("extensions", {}):
+        from .css import load_css_policy
+
+        try:
+            load_css_policy(system)
+        except FormatError as error:
+            errors.append(str(error))
     return errors
 
 

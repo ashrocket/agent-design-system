@@ -11,6 +11,7 @@ from typing import Any
 
 from . import __version__
 from .conformance import run_suite
+from .css import agent_context, enforce_css, render_context, render_tokens
 from .enforce import enforce
 from .format import FormatError, load_json, validate_design_system
 from .reporters import SEVERITY_LEVEL, render, should_fail
@@ -47,13 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     validate.set_defaults(handler=_validate)
 
     check = commands.add_parser(
-        "check", help="check a JSON document without changing it"
+        "check", help="check JSON or CSS source without changing it"
     )
     _add_enforcement_arguments(check)
     check.set_defaults(handler=_check)
 
     fix = commands.add_parser(
-        "fix", help="apply decision-tree coercions to a JSON document"
+        "fix", help="apply approved repairs to JSON or CSS source"
     )
     _add_enforcement_arguments(fix)
     destination = fix.add_mutually_exclusive_group(required=True)
@@ -64,6 +65,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--write", action="store_true", help="replace the input document"
     )
     fix.set_defaults(handler=_fix)
+
+    context = commands.add_parser(
+        "context", help="export the approved CSS contract for a coding assistant"
+    )
+    context.add_argument("system")
+    context.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    context.add_argument("--output", help="write a file instead of stdout")
+    context.set_defaults(handler=_context)
+
+    tokens = commands.add_parser(
+        "tokens", help="generate the contract's CSS custom-property stylesheet"
+    )
+    tokens.add_argument("system")
+    tokens.add_argument("--output", help="write a file instead of stdout")
+    tokens.set_defaults(handler=_tokens)
 
     conformance = commands.add_parser(
         "conformance", help="run language-neutral ADSF conformance vectors"
@@ -160,7 +176,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _add_enforcement_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("system", help="ADSF design-system JSON")
-    parser.add_argument("document", help="JSON document to inspect")
+    parser.add_argument("document", help="JSON document or CSS source to inspect")
+    parser.add_argument(
+        "--input-format",
+        choices=("json", "css"),
+        default="json",
+        help="inspect a JSON document or authored CSS source",
+    )
     parser.add_argument("--format", choices=("text", "json", "sarif"), default="text")
     parser.add_argument("--fail-on", choices=tuple(SEVERITY_LEVEL), default="error")
     parser.add_argument("--log", help="append each violation as JSON Lines")
@@ -195,10 +217,14 @@ def _fix(args: argparse.Namespace) -> int:
     _guard_enforcement_paths(args, fixing=True)
     result = _enforcement_result(args, apply_fixes=True)
     destination = Path(args.document if args.write else args.output)
-    final = enforce(load_json(args.system), result.document, source=str(destination))
-    _atomic_write(
-        destination, json.dumps(result.document, indent=2, ensure_ascii=False) + "\n"
-    )
+    system = load_json(args.system)
+    if args.input_format == "css":
+        final = enforce_css(system, result.document, source=str(destination))
+        content = result.document
+    else:
+        final = enforce(system, result.document, source=str(destination))
+        content = json.dumps(result.document, indent=2, ensure_ascii=False) + "\n"
+    _atomic_write(destination, content)
     print(render(result, args.format))
     print(f"WROTE {destination}", file=sys.stderr)
     _append_log(args.log, result.to_dict()["violations"], args.document)
@@ -267,8 +293,43 @@ def _conformance(args: argparse.Namespace) -> int:
 
 def _enforcement_result(args: argparse.Namespace, *, apply_fixes: bool):
     system = load_json(args.system)
+    if args.input_format == "css":
+        with Path(args.document).open(encoding="utf-8", newline="") as handle:
+            return enforce_css(
+                system, handle.read(), source=args.document, apply_fixes=apply_fixes
+            )
     document = load_json(args.document)
     return enforce(system, document, source=args.document, apply_fixes=apply_fixes)
+
+
+def _export(args: argparse.Namespace, content: str) -> int:
+    if args.output:
+        if _same_path(args.output, args.system):
+            raise FormatError("export must not overwrite the design system")
+        _atomic_write(Path(args.output), content)
+    else:
+        print(content, end="")
+    return 0
+
+
+def _context(args: argparse.Namespace) -> int:
+    system = load_json(args.system)
+    content = (
+        json.dumps(
+            agent_context(system, args.system),
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        + "\n"
+        if args.format == "json"
+        else render_context(system, args.system)
+    )
+    return _export(args, content)
+
+
+def _tokens(args: argparse.Namespace) -> int:
+    return _export(args, render_tokens(load_json(args.system)))
 
 
 def _append_log(

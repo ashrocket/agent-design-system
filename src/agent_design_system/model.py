@@ -32,6 +32,8 @@ class Violation:
     disposition: Disposition
     replacement: Any = None
     rationale: str = ""
+    line: int | None = None
+    column: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = {
@@ -45,6 +47,8 @@ class Violation:
         }
         if self.disposition == "coerce":
             data["replacement"] = self.replacement
+        if self.line is not None and self.column is not None:
+            data["location"] = {"line": self.line, "column": self.column}
         return data
 
 
@@ -54,6 +58,8 @@ class EnforcementResult:
     violations: list[Violation] = field(default_factory=list)
     document: Any = None
     changed: bool = False
+    coverage: dict[str, Any] | None = None
+    contract_sha256: str | None = None
 
     @property
     def counts(self) -> dict[str, int]:
@@ -63,7 +69,7 @@ class EnforcementResult:
         return counts
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "format": "adsf-enforcement-report",
             "version": "0.1.0",
             "source": self.source,
@@ -71,3 +77,8 @@ class EnforcementResult:
             "counts": self.counts,
             "violations": [violation.to_dict() for violation in self.violations],
         }
+        if self.coverage is not None:
+            data["coverage"] = self.coverage
+        if self.contract_sha256 is not None:
+            data["contract_sha256"] = self.contract_sha256
+        return data
