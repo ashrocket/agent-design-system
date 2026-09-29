@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -183,6 +184,7 @@ def _validate(args: argparse.Namespace) -> int:
 
 
 def _check(args: argparse.Namespace) -> int:
+    _guard_enforcement_paths(args, fixing=False)
     result = _enforcement_result(args, apply_fixes=False)
     print(render(result, args.format))
     _append_log(args.log, result.to_dict()["violations"], args.document)
@@ -190,26 +192,62 @@ def _check(args: argparse.Namespace) -> int:
 
 
 def _fix(args: argparse.Namespace) -> int:
+    _guard_enforcement_paths(args, fixing=True)
     result = _enforcement_result(args, apply_fixes=True)
     destination = Path(args.document if args.write else args.output)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(result.document, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    final = enforce(load_json(args.system), result.document, source=str(destination))
+    _atomic_write(
+        destination, json.dumps(result.document, indent=2, ensure_ascii=False) + "\n"
     )
     print(render(result, args.format))
     print(f"WROTE {destination}", file=sys.stderr)
     _append_log(args.log, result.to_dict()["violations"], args.document)
-    unresolved = [
-        violation
-        for violation in result.violations
-        if violation.disposition not in {"coerce", "ignore"}
-        and (
-            violation.disposition == "reject"
-            or SEVERITY_LEVEL[violation.severity] >= SEVERITY_LEVEL[args.fail_on]
+    rejected = any(violation.disposition == "reject" for violation in result.violations)
+    return 1 if rejected or should_fail(final, args.fail_on) else 0
+
+
+def _same_path(left: str | Path, right: str | Path) -> bool:
+    a, b = Path(left), Path(right)
+    try:
+        return a.resolve() == b.resolve() or (
+            a.exists() and b.exists() and a.samefile(b)
         )
-    ]
-    return 1 if unresolved else 0
+    except RuntimeError as error:
+        raise FormatError(f"invalid path: {error}") from error
+
+
+def _guard_enforcement_paths(args: argparse.Namespace, *, fixing: bool) -> None:
+    protected = [args.system, args.document]
+    if fixing:
+        if args.write and Path(args.document).is_symlink():
+            raise FormatError("--write requires a direct input path, not a symlink")
+        destination = args.document if args.write else args.output
+        if _same_path(destination, args.system):
+            raise FormatError("output must not overwrite the design system")
+        if not args.write and _same_path(destination, args.document):
+            raise FormatError(
+                "output aliases the input; use --write for an in-place edit"
+            )
+        protected.append(destination)
+    if args.log and any(_same_path(args.log, path) for path in protected):
+        raise FormatError("log must not alias the design system, input, or output")
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, delete=False
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+        if path.exists():
+            temporary.chmod(path.stat().st_mode & 0o777)
+        temporary.replace(path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
 
 def _conformance(args: argparse.Namespace) -> int:

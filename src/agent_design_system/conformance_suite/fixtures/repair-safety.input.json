@@ -1,0 +1,8 @@
+{
+  "large": 9007199254740992,
+  "nullable": "wrong",
+  "noop": "wrong",
+  "nested": {
+    "selected": "wrong"
+  }
+}

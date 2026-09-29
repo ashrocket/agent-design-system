@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import math
 import re
+from fractions import Fraction
 from typing import Any
 
 from .format import (
@@ -38,21 +39,25 @@ def enforce(
                 continue
             violation = _decide(rule, match, tokens)
             violations.append(violation)
-            if (
-                apply_fixes
-                and violation.disposition == "coerce"
-                and violation.replacement is not None
-            ):
+            if apply_fixes and violation.disposition == "coerce":
                 pending_fixes.append((match.segments, violation.replacement))
 
+    paths = {segments for segments, _ in pending_fixes}
+    for segments in paths:
+        if not segments:
+            raise FormatError("cannot coerce the document root")
+        if any(segments[:index] in paths for index in range(1, len(segments))):
+            raise FormatError(
+                "cannot apply overlapping ancestor and descendant coercions"
+            )
     for segments, replacement in pending_fixes:
-        assign(output, segments, replacement)
+        assign(output, segments, copy.deepcopy(replacement))
 
     return EnforcementResult(
         source=source,
         violations=violations,
         document=output,
-        changed=bool(pending_fixes),
+        changed=not _json_equal(document, output),
     )
 
 
@@ -97,7 +102,11 @@ def _decide(rule: dict[str, Any], match: Match, tokens: dict[str, Token]) -> Vio
             else None
         )
         disposition = action["type"]
-        if disposition == "coerce" and replacement is None:
+        if (
+            disposition == "coerce"
+            and action.get("strategy") == "nearest-token"
+            and replacement is None
+        ):
             disposition = "report"
         message = action.get("message") or f"{rule['description']} at {match.path}"
         return Violation(
@@ -150,7 +159,7 @@ def _replacement(action: dict[str, Any], value: Any, tokens: dict[str, Token]) -
 def _nearest_token_reference(
     value: Any, tokens: dict[str, Token], category: str | None
 ) -> str | None:
-    candidates: list[tuple[float, str]] = []
+    candidates: list[tuple[Fraction | int, str]] = []
     for token_path in sorted(tokens):
         if category and not token_path.startswith(f"{category}."):
             continue
@@ -167,19 +176,17 @@ def _nearest_token_reference(
     return "{" + best_path + "}"
 
 
-def _distance(left: Any, right: Any) -> float | None:
+def _distance(left: Any, right: Any) -> Fraction | int | None:
     if isinstance(left, bool) or isinstance(right, bool):
         return None
     if isinstance(left, (int, float)) and isinstance(right, (int, float)):
-        return abs(float(left) - float(right))
+        return abs(Fraction(str(left)) - Fraction(str(right)))
     left_color = _parse_color(left)
     right_color = _parse_color(right)
     if left_color is not None and right_color is not None:
-        return math.sqrt(
-            sum((a - b) ** 2 for a, b in zip(left_color, right_color, strict=True))
-        )
+        return sum((a - b) ** 2 for a, b in zip(left_color, right_color, strict=True))
     if isinstance(left, str) and isinstance(right, str):
-        return 0.0 if left == right else None
+        return 0 if left == right else None
     return None
 
 
@@ -199,7 +206,13 @@ def _is_type(value: Any, expected: str | None) -> bool:
     return {
         "string": isinstance(value, str),
         "number": isinstance(value, (int, float)) and not isinstance(value, bool),
-        "integer": isinstance(value, int) and not isinstance(value, bool),
+        "integer": (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            or isinstance(value, float)
+            and math.isfinite(value)
+            and value.is_integer()
+        ),
         "boolean": isinstance(value, bool),
         "object": isinstance(value, dict),
         "array": isinstance(value, list),
@@ -231,7 +244,7 @@ def _json_equal(left: Any, right: Any) -> bool:
             and not isinstance(left, bool)
             and isinstance(right, (int, float))
             and not isinstance(right, bool)
-            and float(left) == float(right)
+            and left == right
         )
     if type(left) is not type(right):
         return False

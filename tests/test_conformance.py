@@ -19,7 +19,7 @@ class ConformanceTests(unittest.TestCase):
     def test_normative_suite_passes(self) -> None:
         result = run_suite(SUITE / "manifest.json")
         self.assertTrue(result.passed)
-        self.assertEqual(len(result.cases), 7)
+        self.assertEqual(len(result.cases), 9)
 
     def test_one_case_can_be_selected(self) -> None:
         result = run_suite(SUITE / "manifest.json", only_case="reject-always-fails")

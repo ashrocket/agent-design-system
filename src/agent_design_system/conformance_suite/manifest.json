@@ -192,6 +192,86 @@
       "expected": {
         "valid": false
       }
+    },
+    {
+      "id": "exact-equality-null-and-unique-selection",
+      "operation": "enforce",
+      "system": "fixtures/repair-safety.design-system.json",
+      "document": "fixtures/repair-safety.input.json",
+      "apply_fixes": true,
+      "expected": {
+        "changed": true,
+        "violations": [
+          {
+            "rule_id": "exact-large-number",
+            "path": "$.large",
+            "severity": "error",
+            "disposition": "report"
+          },
+          {
+            "rule_id": "literal-null",
+            "path": "$.nullable",
+            "severity": "error",
+            "disposition": "coerce",
+            "replacement": null
+          },
+          {
+            "rule_id": "noop-repair",
+            "path": "$.noop",
+            "severity": "error",
+            "disposition": "coerce",
+            "replacement": "wrong"
+          },
+          {
+            "rule_id": "unique-recursive-match",
+            "path": "$.nested.selected",
+            "severity": "error",
+            "disposition": "report"
+          }
+        ],
+        "fails": {
+          "info": true,
+          "warning": true,
+          "error": true,
+          "never": false
+        },
+        "document": {
+          "large": 9007199254740992,
+          "nullable": null,
+          "noop": "wrong",
+          "nested": {
+            "selected": "wrong"
+          }
+        }
+      }
+    },
+    {
+      "id": "noop-repair-does-not-change-document",
+      "operation": "enforce",
+      "system": "fixtures/repair-safety.design-system.json",
+      "document": "fixtures/noop.input.json",
+      "apply_fixes": true,
+      "expected": {
+        "changed": false,
+        "violations": [
+          {
+            "rule_id": "noop-repair",
+            "path": "$.noop",
+            "severity": "error",
+            "disposition": "coerce",
+            "replacement": "wrong"
+          }
+        ],
+        "fails": {
+          "info": true,
+          "warning": true,
+          "error": true,
+          "never": false
+        },
+        "document": {
+          "noop": "wrong"
+        }
+      }
     }
   ]
 }

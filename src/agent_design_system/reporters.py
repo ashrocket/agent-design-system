@@ -28,7 +28,7 @@ def render_text(result: EnforcementResult) -> str:
     ]
     for violation in result.violations:
         suffix = ""
-        if violation.replacement is not None:
+        if violation.disposition == "coerce":
             suffix = f" -> {json.dumps(violation.replacement, ensure_ascii=False)}"
         lines.append(
             f"{violation.severity.upper():7} {violation.rule_id} {violation.path}: "

@@ -43,7 +43,7 @@ class Violation:
             "disposition": self.disposition,
             "rationale": self.rationale,
         }
-        if self.replacement is not None:
+        if self.disposition == "coerce":
             data["replacement"] = self.replacement
         return data
 
