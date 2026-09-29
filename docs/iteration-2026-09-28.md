@@ -61,17 +61,45 @@ those were corrected before the enforcement-safety commit.
   could inspect relayed parser code but could not run an independent checkout
   because Codex's shared daemon exhausted its 256-file-handle soft limit.
 
-## Remaining iterations
+## Second iteration: whole-project CSS gate
 
-1. Finish the independent CSS panel re-review as process headroom allows.
-2. Add a fixture app, project-wide source coverage manifest and generated-token
-   parity checks. A single assistant-selected CSS path remains an omission gap.
-3. Detect unsupported inline/utility/runtime styling surfaces instead of allowing
-   uninspected files to imply complete source compliance.
-4. Add component/semantic constraints where evidence supports useful adapters.
-5. Separately harden malformed research event/result handling and persist
-   reservations before subprocess execution. Current failed records were preserved;
-   the panel found interruption/untrusted-payload charging gaps in the runner.
+The assistant workflow reviewer independently ran the fixture gate and found a
+passing scan of two CSS files, 15 declarations (11 governed), and one HTML file.
+The reviewer then found two static-HTML bypasses: `<base href>` can rebase a
+relative token stylesheet, and duplicate `href` attributes can make parser and
+browser interpretations diverge. Both now fail with focused regressions. The
+HTML report lists inspected paths, hashes and stylesheet references; legacy
+presentational attributes also fail. The reviewer identified a handoff gap:
+the exported assistant context still told agents to check one chosen CSS file.
+It now accepts a reviewed project manifest and fingerprint, makes the pinned
+project command the primary handoff gate, and presents single-file checking as
+a diagnostic. Context export refuses a failing gate or different system.
+
+The explicit `adsf-css-project` manifest defines the root, system, generated
+token file and reasoned exclusions. The read-only gate recursively discovers
+CSS, checks token-sheet byte parity, inventories static HTML, flags unsupported
+source formats and inline or external styling surfaces, and records coverage.
+A manifest/system fingerprint must match the reviewed CI pin. Exclusions are
+visible in the report and change the fingerprint. The fixture app demonstrates
+the contract without an application framework. The local verifier mutates a
+temporary copy to prove new CSS drift, stale tokens, inline styles, TSX and
+manifest tampering fail.
+
+The second iteration passed 89 unit tests, nine normative conformance cases,
+Ruff format/lint, mypy on 13 source files, and both CSS integration verifiers
+on local Python 3.11. These are local results; no remote CI run is claimed.
+
+## Remaining research and limits
+
+1. The gate needs adapters for JSX, utility classes, CSS-in-JS, SVG, framework
+   templates and browser-computed styles before those sources can pass without
+   reviewed exclusions. Component reuse and per-selector semantic intent remain
+   outside this bounded gate.
+2. Independent review and branch protection must pin the manifest, contract and
+   CI workflow; an assistant able to edit all of them could update its own pin.
+3. Research reservations still need to be durably persisted before subprocess
+   execution, and malformed/untrusted event handling needs hardening. Current
+   failed attempts are accounted for, but no valid findings have been produced.
 
 Jev was unavailable in this session (no exposed tool or API credential), so the
 panel used direct code evidence. The MacBook worker readiness snapshot reported

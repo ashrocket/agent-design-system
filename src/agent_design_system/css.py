@@ -565,7 +565,9 @@ def render_tokens(system: dict[str, Any]) -> str:
     )
 
 
-def agent_context(system: dict[str, Any], system_path: str) -> dict[str, Any]:
+def agent_context(
+    system: dict[str, Any], system_path: str, *, project_gate: str | None = None
+) -> dict[str, Any]:
     policy = load_css_policy(system)
     name = sorted(policy.properties)[0]
     binding = policy.bindings[policy.properties[name]["tokens"][0]]
@@ -589,13 +591,29 @@ def agent_context(system: dict[str, Any], system_path: str) -> dict[str, Any]:
             "reason": "Priority overrides are forbidden even with an approved token.",
         },
     ]
+    file_gate = f"adsys check {shlex.quote(system_path)} PATH.css --input-format css"
+    limits = [
+        "Standalone CSS files only; JSX, inline styles, Tailwind, CSS-in-JS and other files require additional adapters.",
+        "No assurance of component reuse, layout quality, accessibility, browser-computed styles, or per-selector semantic intent.",
+        "Grouping at-rules are supported; nested rules, imports, escapes and other at-rules are rejected.",
+        "The generated token stylesheet must be installed and protected separately; component CSS cannot redefine variables.",
+    ]
+    if project_gate is None:
+        limits.append(
+            "The single-file gate does not prove whole-project coverage; use a reviewed project manifest for that claim."
+        )
+    else:
+        limits[0] = (
+            "The project gate discovers CSS and reports unsupported styling sources; those sources require adapters or reviewed exclusions."
+        )
     return {
         "format": "adsf-agent-context",
         "version": "0.1.0",
         "system": system_path,
         "name": system["name"],
         "contract_sha256": policy.sha256,
-        "gate": f"adsys check {shlex.quote(system_path)} PATH.css --input-format css",
+        "gate": project_gate or file_gate,
+        "fast_file_check": file_gate,
         "tokens": {
             path: {
                 "variable": binding.name,
@@ -609,17 +627,14 @@ def agent_context(system: dict[str, Any], system_path: str) -> dict[str, Any]:
         },
         "unrestricted_properties": sorted(policy.unrestricted),
         "examples": examples,
-        "limits": [
-            "Standalone CSS files only; JSX, inline styles, Tailwind, CSS-in-JS and other files require additional adapters.",
-            "No assurance of component reuse, layout quality, accessibility, browser-computed styles, or per-selector semantic intent.",
-            "Grouping at-rules are supported; nested rules, imports, escapes and other at-rules are rejected.",
-            "The generated token stylesheet must be installed and protected separately; component CSS cannot redefine variables.",
-        ],
+        "limits": limits,
     }
 
 
-def render_context(system: dict[str, Any], system_path: str) -> str:
-    context = agent_context(system, system_path)
+def render_context(
+    system: dict[str, Any], system_path: str, *, project_gate: str | None = None
+) -> str:
+    context = agent_context(system, system_path, project_gate=project_gate)
     lines = [
         f"# Design contract: {system['name']}",
         "",
@@ -632,6 +647,12 @@ def render_context(system: dict[str, Any], system_path: str) -> str:
         "",
         "```sh",
         context["gate"],
+        "```",
+        "",
+        "For a quick single-file diagnostic, you can also run:",
+        "",
+        "```sh",
+        context["fast_file_check"],
         "```",
         "",
         "## Approved tokens",

@@ -212,7 +212,8 @@
       "properties": {
         "color": {
           "tokens": [
-            "color.text.primary"
+            "color.text.primary",
+            "color.surface.canvas"
           ]
         },
         "background-color": {

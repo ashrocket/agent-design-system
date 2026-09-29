@@ -38,6 +38,8 @@ jobs:
         run: adsys conformance
       - name: Verify assistant CSS source workflow
         run: python scripts/verify-css-workflow.py
+      - name: Verify pinned project-wide CSS gate
+        run: python scripts/verify-project-workflow.py
       - name: Verify failing example fails
         run: |
           if adsys check examples/aurora.design-system.json examples/button.invalid.json; then

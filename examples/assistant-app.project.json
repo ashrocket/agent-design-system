@@ -1,0 +1,8 @@
+{
+  "format": "adsf-css-project",
+  "version": "0.1.0",
+  "root": "assistant-app",
+  "system": "aurora.design-system.json",
+  "tokens": "tokens.css",
+  "exclusions": []
+}

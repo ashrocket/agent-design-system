@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import sys
 import tempfile
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from .conformance import run_suite
 from .css import agent_context, enforce_css, render_context, render_tokens
 from .enforce import enforce
 from .format import FormatError, load_json, validate_design_system
+from .project import check_project
 from .reporters import SEVERITY_LEVEL, render, should_fail
 from .research import (
     build_prompt,
@@ -70,6 +72,13 @@ def build_parser() -> argparse.ArgumentParser:
         "context", help="export the approved CSS contract for a coding assistant"
     )
     context.add_argument("system")
+    context.add_argument(
+        "--project-manifest", help="reviewed project manifest for the primary gate"
+    )
+    context.add_argument(
+        "--expected-sha256",
+        help="required reviewed fingerprint with --project-manifest",
+    )
     context.add_argument("--format", choices=("markdown", "json"), default="markdown")
     context.add_argument("--output", help="write a file instead of stdout")
     context.set_defaults(handler=_context)
@@ -80,6 +89,16 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("system")
     tokens.add_argument("--output", help="write a file instead of stdout")
     tokens.set_defaults(handler=_tokens)
+
+    project_check = commands.add_parser(
+        "project-check", help="check non-excluded CSS under a reviewed project root"
+    )
+    project_check.add_argument("manifest", help="reviewed CSS project manifest")
+    project_check.add_argument(
+        "--expected-sha256", help="reviewed system and manifest fingerprint"
+    )
+    project_check.add_argument("--format", choices=("text", "json"), default="text")
+    project_check.set_defaults(handler=_project_check)
 
     conformance = commands.add_parser(
         "conformance", help="run language-neutral ADSF conformance vectors"
@@ -314,22 +333,67 @@ def _export(args: argparse.Namespace, content: str) -> int:
 
 def _context(args: argparse.Namespace) -> int:
     system = load_json(args.system)
+    project_gate = None
+    if bool(args.project_manifest) != bool(args.expected_sha256):
+        raise FormatError(
+            "project context requires both --project-manifest and --expected-sha256"
+        )
+    if args.project_manifest:
+        report = check_project(
+            args.project_manifest, expected_sha256=args.expected_sha256
+        )
+        if report["status"] != "pass":
+            raise FormatError("project gate must pass before exporting its context")
+        manifest = load_json(args.project_manifest)
+        declared_system = (
+            Path(args.project_manifest).absolute().parent / manifest["system"]
+        )
+        if system != load_json(declared_system):
+            raise FormatError(
+                "context system differs from the project's declared system"
+            )
+        project_gate = (
+            f"adsys project-check {shlex.quote(args.project_manifest)} "
+            f"--expected-sha256 {args.expected_sha256}"
+        )
     content = (
         json.dumps(
-            agent_context(system, args.system),
+            agent_context(system, args.system, project_gate=project_gate),
             indent=2,
             sort_keys=True,
             ensure_ascii=False,
         )
         + "\n"
         if args.format == "json"
-        else render_context(system, args.system)
+        else render_context(system, args.system, project_gate=project_gate)
     )
     return _export(args, content)
 
 
 def _tokens(args: argparse.Namespace) -> int:
     return _export(args, render_tokens(load_json(args.system)))
+
+
+def _project_check(args: argparse.Namespace) -> int:
+    report = check_project(args.manifest, expected_sha256=args.expected_sha256)
+    if args.format == "json":
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        coverage = report["coverage"]
+        print(
+            f"{report['status'].upper()} project CSS: {coverage['css_files']} file(s), "
+            f"{coverage['css_declarations']} declaration(s), "
+            f"{coverage['governed_declarations']} governed; "
+            f"{len(report['issues'])} issue(s); contract {report['contract_sha256']}"
+        )
+        for issue in report["issues"]:
+            print(f"  {issue['path']}: {issue['code']}: {issue['message']}")
+        for exclusion in coverage["exclusions"]:
+            print(
+                f"  UNINSPECTED {exclusion['path']}: {exclusion['reason']} "
+                f"({'present' if exclusion['present'] else 'unused'})"
+            )
+    return 0 if report["status"] == "pass" else 1
 
 
 def _append_log(

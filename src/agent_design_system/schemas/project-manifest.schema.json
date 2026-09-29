@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adsf:schema:css-project-manifest:0.1.0",
+  "title": "ADSF CSS project coverage manifest",
+  "type": "object",
+  "required": ["format", "version", "root", "system", "tokens", "exclusions"],
+  "additionalProperties": false,
+  "properties": {
+    "format": {"const": "adsf-css-project"},
+    "version": {"const": "0.1.0"},
+    "root": {"type": "string", "minLength": 1},
+    "system": {"type": "string", "minLength": 1},
+    "tokens": {"type": "string", "minLength": 1},
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

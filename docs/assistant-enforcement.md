@@ -109,5 +109,52 @@ JavaScript follow the contract. It does not enforce component reuse, per-selecto
 semantic intent, layout quality or accessibility. Those need further source
 adapters, app-level coverage and browser verification.
 
-The next integration milestone is an explicit source manifest, generated-token
-parity checks, and detection of unsupported styling surfaces in a fixture app.
+## Project-wide source gate
+
+`adsys project-check` reads an `adsf-css-project` manifest. It discovers every
+CSS file under `root` (including uppercase `.CSS`), checks the generated token
+stylesheet byte for byte, and reports each file's SHA-256 and declaration count.
+The [fixture manifest](../examples/assistant-app.project.json) points to a
+small HTML app with two authored CSS files. Its paths are relative to the
+manifest directory, except `tokens` and each exclusion path, which are relative
+to the scan root. Paths must be canonical and may not escape through `..` or
+symlinks. Explicit exclusions require a reason and appear in the report; a
+missing exclusion is reported as unused. `.git` is the only built-in exclusion.
+
+```sh
+adsys project-check examples/assistant-app.project.json --format json
+adsys project-check examples/assistant-app.project.json \
+  --expected-sha256 4be9001fef49440bee48e19b1aa938e95d44007960b52df28cdc4310dcf3315a
+adsys context examples/aurora.design-system.json \
+  --project-manifest examples/assistant-app.project.json \
+  --expected-sha256 4be9001fef49440bee48e19b1aa938e95d44007960b52df28cdc4310dcf3315a \
+  --output /tmp/assistant-contract.md
+```
+
+The second command compares the current design system and manifest with an
+independently reviewed fingerprint. The exported assistant context makes this
+pinned project command its primary handoff gate and labels the single-file
+check as a quick diagnostic. Context export refuses a failed project gate or a
+different design system. The CI workflow runs an integration
+verifier containing that pinned value. A passing project check means the
+discovered CSS and static HTML inventory met this limited contract. It does
+not prove browser loading or computed styles. An HTML stylesheet reference
+is evidence of a reference, not proof that a browser loaded it.
+
+Static HTML inspection rejects inline style attributes and tags, `<base>` URL
+rebasing, duplicate attributes, presentation
+attributes, scripts/event handlers, embedded SVG, and external or uninspected
+stylesheet references. JS, TS, JSX, TSX, CSS-in-JS candidates, preprocessors,
+Svelte, Vue, MDX, Astro, and standalone SVG are reported as unverified rather
+than silently passed. A project with any such source exits nonzero until an
+adapter is added or a reviewed exclusion is declared. The gate remains offline
+and read-only; invalid manifests or unsafe paths exit 2, while source drift,
+token mismatch, and unverified coverage exit 1.
+
+The policy, manifest, exclusion reasons, expected fingerprint, and CI
+invocation all need independent review and branch protection. A fingerprint
+stored in editable source cannot stop an assistant from changing both the
+contract and its expected value. The HTML inventory is intentionally bounded;
+it does not validate arbitrary HTML syntax, runtime DOM changes, utility class
+semantics, component reuse, or accessibility. Browser and app-level review are
+still required for those claims.
