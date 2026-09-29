@@ -1,0 +1,28 @@
+{
+  "charged_tokens": 9000,
+  "error": "agent returned an empty result",
+  "finished_at": "2026-09-21T07:18:20.836322Z",
+  "plan": {
+    "budget_before": {
+      "daily": 0,
+      "monthly": 9000,
+      "weekly": 0
+    },
+    "budget_limits": {
+      "daily": 12000,
+      "monthly": 280000,
+      "weekly": 70000
+    },
+    "decision": "run",
+    "format": "adsf-research-plan",
+    "planned_at": "2026-09-21T07:17:11.624345Z",
+    "question": "Audit report, coerce, reject, and ignore decisions for determinism and data-loss risk. Find cases where coercion should be forbidden or where a fallback is ambiguous, with repository evidence.",
+    "question_id": "decision-safety-audit",
+    "reserved_tokens": 9000,
+    "run_id": "20260921T071711Z-e20e1fd6",
+    "version": "0.1.0"
+  },
+  "result": null,
+  "status": "failed",
+  "usage": null
+}

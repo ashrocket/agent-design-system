@@ -1,0 +1,29 @@
+{
+  "charged_tokens": 9000,
+  "error": "research result missing required property: run_id",
+  "finished_at": "2026-09-23T07:17:51.238350Z",
+  "plan": {
+    "budget_before": {
+      "daily": 0,
+      "monthly": 27000,
+      "weekly": 18000
+    },
+    "budget_limits": {
+      "daily": 12000,
+      "monthly": 280000,
+      "weekly": 70000
+    },
+    "decision": "run",
+    "format": "adsf-research-plan",
+    "planned_at": "2026-09-23T07:17:05.889203Z",
+    "question": "Assess where the current ADSF token and rule structures can interoperate cleanly with common design-token and static-analysis conventions, using only evidence available in the repository. Separate proven compatibility from hypotheses requiring external research.",
+    "question_id": "interoperability-audit",
+    "reserved_tokens": 9000,
+    "run_id": "20260923T071705Z-f6f14d36",
+    "version": "0.1.0"
+  },
+  "raw_result": "{\"error\": \"2026-09-23T07:17:11.851424Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\\n2026-09-23T07:17:34.493551Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest(\\\"http/request failed: error sending request for url (https://developers.openai.com/mcp?source=codex)\\\")))\\n2026-09-23T07:17:42.940926Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest(\\\"http/request failed: error sending request for url (https://chatgpt.com/backend-api/ps/mcp)\\\")))\\n\"}",
+  "result": null,
+  "status": "failed",
+  "usage": null
+}
