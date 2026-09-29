@@ -8,12 +8,13 @@ import os
 import re
 import stat
 from html.parser import HTMLParser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
 
 from .css import enforce_css, render_tokens
 from .format import FormatError, load_json
+from .tsx import MAX_TSX_BYTES, PROFILE, AdapterDriftError, inspect_static_tsx
 
 MAX_SOURCE_BYTES = 8 * 1024 * 1024
 MAX_SCAN_DEPTH = 64
@@ -111,6 +112,28 @@ def _hash_unverified(path: Path, size: int) -> str | None:
     return digest.hexdigest()
 
 
+def _tsx_import_path(source: str, specifier: str) -> str:
+    if (
+        not specifier.startswith(("./", "../"))
+        or not specifier.endswith(".css")
+        or any(character in specifier for character in "\\%?#:")
+    ):
+        raise FormatError(f"unsafe TSX CSS import: {specifier}")
+    parts = list(PurePosixPath(source).parent.parts)
+    for part in specifier.split("/"):
+        if part == ".":
+            continue
+        if part == "..":
+            if not parts:
+                raise FormatError(f"TSX CSS import escapes project root: {specifier}")
+            parts.pop()
+        elif not part:
+            raise FormatError(f"noncanonical TSX CSS import: {specifier}")
+        else:
+            parts.append(part)
+    return "/".join(parts)
+
+
 class _HTMLCoverage(HTMLParser):
     def __init__(self, source: str, issues: list[dict[str, str]]) -> None:
         super().__init__(convert_charrefs=True)
@@ -195,19 +218,40 @@ def check_project(
     if manifest_file.is_symlink() or not manifest_file.is_file():
         raise FormatError("project manifest must be a regular, direct file")
     manifest = load_json(manifest_file)
-    if not isinstance(manifest, dict) or set(manifest) != {
+    required = {
         "format",
         "version",
         "root",
         "system",
         "tokens",
         "exclusions",
-    }:
+    }
+    if (
+        not isinstance(manifest, dict)
+        or not required.issubset(manifest)
+        or set(manifest) - required - {"tsx"}
+    ):
         raise FormatError(
-            "project manifest requires format, version, root, system, tokens, exclusions only"
+            "project manifest requires format, version, root, system, tokens, exclusions, and optional tsx only"
         )
     if manifest["format"] != "adsf-css-project" or manifest["version"] != "0.1.0":
         raise FormatError("unsupported CSS project manifest format or version")
+    tsx_enabled = "tsx" in manifest
+    if tsx_enabled:
+        tsx_policy = manifest["tsx"]
+        if (
+            not isinstance(tsx_policy, dict)
+            or set(tsx_policy) != {"profile", "adapter_sha256", "lock_sha256"}
+            or tsx_policy["profile"] != PROFILE
+            or not all(
+                isinstance(tsx_policy[key], str)
+                and re.fullmatch(r"[0-9a-f]{64}", tsx_policy[key])
+                for key in ("adapter_sha256", "lock_sha256")
+            )
+        ):
+            raise FormatError(
+                "tsx requires the static-jsx-v1 profile and reviewed adapter and lock SHA-256 pins"
+            )
     base = manifest_file.parent.resolve(strict=True)
     root_parts = _relative(manifest["root"], "root", root=True)
     system_parts = _relative(manifest["system"], "system")
@@ -292,6 +336,7 @@ def check_project(
 
     files: list[dict[str, Any]] = []
     html: list[tuple[str, str, str]] = []
+    tsx_sources: list[tuple[str, str, str]] = []
     unverified: list[str] = []
     unverified_sources: list[dict[str, Any]] = []
     trusted_sources: list[dict[str, str]] = []
@@ -347,7 +392,9 @@ def check_project(
                 )
                 continue
             suffix = path.suffix.lower()
-            if suffix not in {".css", ".html", ".htm"}:
+            if suffix not in {".css", ".html", ".htm"} and not (
+                suffix == ".tsx" and tsx_enabled
+            ):
                 size = entry.stat(follow_symlinks=False).st_size
                 digest = _hash_unverified(path, size)
                 unverified.append(name)
@@ -367,14 +414,15 @@ def check_project(
                     f"{suffix or 'extensionless'} source or asset needs an adapter or reviewed exclusion",
                 )
                 continue
+            source_limit = MAX_TSX_BYTES if suffix == ".tsx" else MAX_SOURCE_BYTES
             with path.open("rb") as handle:
-                content = handle.read(MAX_SOURCE_BYTES + 1)
-            if len(content) > MAX_SOURCE_BYTES:
+                content = handle.read(source_limit + 1)
+            if len(content) > source_limit:
                 _issue(
                     issues,
                     name,
                     "source-too-large",
-                    f"source exceeds {MAX_SOURCE_BYTES} byte inspection limit",
+                    f"source exceeds {source_limit} byte inspection limit",
                 )
                 continue
             digest = hashlib.sha256(content).hexdigest()
@@ -390,7 +438,9 @@ def check_project(
                     "source must be UTF-8 text without NUL bytes",
                 )
                 continue
-            if suffix == ".css":
+            if suffix == ".tsx":
+                tsx_sources.append((name, source, digest))
+            elif suffix == ".css":
                 try:
                     result = enforce_css(system, source, source=name)
                 except FormatError as error:
@@ -414,6 +464,87 @@ def check_project(
     classes_by_path = {
         item["path"]: set(item["coverage"]["selector_classes"]) for item in files
     }
+    tsx_coverage: list[dict[str, Any]] = []
+    for name, source, digest in tsx_sources:
+        try:
+            tsx_report = inspect_static_tsx(
+                name,
+                source,
+                digest,
+                expected_adapter_sha256=manifest["tsx"]["adapter_sha256"],
+                expected_lock_sha256=manifest["tsx"]["lock_sha256"],
+            )
+        except AdapterDriftError as error:
+            _issue(issues, name, "tsx-adapter-drift", str(error))
+            tsx_coverage.append({"path": name, "sha256": digest, "adapter": "drifted"})
+            continue
+        except FormatError as error:
+            _issue(issues, name, "tsx-adapter-error", str(error))
+            tsx_coverage.append(
+                {"path": name, "sha256": digest, "adapter": "unavailable"}
+            )
+            continue
+        imported: list[str] = []
+        tsx_linked_classes: set[str] = set()
+        token_imported = False
+        for specifier in tsx_report["imports"]:
+            try:
+                target_name = _tsx_import_path(name, specifier)
+            except FormatError as error:
+                _issue(issues, name, "tsx-import-unverified", str(error))
+                continue
+            imported.append(target_name)
+            if target_name == manifest["tokens"]:
+                token_imported = True
+            elif target_name not in inspected:
+                _issue(
+                    issues,
+                    name,
+                    "tsx-import-unverified",
+                    f"CSS import {specifier} was not inspected",
+                )
+            tsx_linked_classes.update(classes_by_path.get(target_name, set()))
+        for item in tsx_report["issues"]:
+            _issue(
+                issues,
+                name,
+                item["code"],
+                f"line {item['line']}:{item['column']}: {item['message']}",
+            )
+        for item in tsx_report["classes"]:
+            if item["name"] not in tsx_linked_classes:
+                _issue(
+                    issues,
+                    name,
+                    "tsx-class-unverified",
+                    f"class {item['name']!r} at line {item['line']}:{item['column']} has no simple base rule in imported, inspected CSS",
+                )
+        if not token_imported:
+            _issue(
+                issues,
+                name,
+                "tsx-tokens-unimported",
+                "static TSX source does not import the generated token stylesheet",
+            )
+        tsx_coverage.append(
+            {
+                "path": name,
+                "sha256": digest,
+                "profile": PROFILE,
+                "parser_version": tsx_report["parser_version"],
+                "adapter_sha256": tsx_report["adapter_sha256"],
+                "lock_sha256": tsx_report["lock_sha256"],
+                "css_imports": imported,
+                "classes": tsx_report["classes"],
+            }
+        )
+    if tsx_enabled and not tsx_sources:
+        _issue(
+            issues,
+            manifest_file.name,
+            "tsx-empty-coverage",
+            "the enabled static TSX profile found no TSX source",
+        )
     html_sources: list[dict[str, Any]] = []
     for name, source, digest in html:
         parser = _HTMLCoverage(name, issues)
@@ -489,6 +620,8 @@ def check_project(
         "css_declarations": sum(item["coverage"]["declarations"] for item in files),
         "governed_declarations": sum(item["coverage"]["governed"] for item in files),
         "html_files": len(html),
+        "tsx_files": len(tsx_sources),
+        "tsx_sources": tsx_coverage,
         "html_sources": html_sources,
         "unverified_files": unverified,
         "unverified_sources": unverified_sources,
@@ -505,7 +638,7 @@ def check_project(
         "built_in_exclusions": [
             {"path": path, "reason": "Git metadata"} for path in built_in
         ],
-        "scope": "authored CSS and static HTML inventory; not computed browser styles or component semantics",
+        "scope": "authored CSS, static HTML, and opt-in static TSX source; not app runtime, computed browser styles, or component semantics",
     }
     if not files or not coverage["governed_declarations"]:
         _issue(

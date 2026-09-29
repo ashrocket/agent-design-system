@@ -6,4 +6,5 @@ __pycache__/
 .coverage
 dist/
 build/
+node_modules/
 research/*.lock

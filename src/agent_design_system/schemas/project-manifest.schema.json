@@ -11,6 +11,16 @@
     "root": {"type": "string", "minLength": 1},
     "system": {"type": "string", "minLength": 1},
     "tokens": {"type": "string", "minLength": 1},
+    "tsx": {
+      "type": "object",
+      "required": ["profile", "adapter_sha256", "lock_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {"const": "static-jsx-v1"},
+        "adapter_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "lock_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
     "exclusions": {
       "type": "array",
       "items": {

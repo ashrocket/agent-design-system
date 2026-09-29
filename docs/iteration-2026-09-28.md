@@ -179,3 +179,40 @@ source-workflow verifiers, Ruff, mypy, and the required example
 validate/check/fix/recheck sequence. The invalid example exits nonzero before
 repair and retains only its accessibility warning after repair. No remote CI
 run or browser-rendered result is claimed.
+
+## Fifth iteration: parser-backed static TSX source
+
+The panel evaluated an opt-in TSX plan and rejected a class-name-only AST walk
+as unsound. An otherwise static JSX return could hide style changes in function
+statements, default parameters, imports, JSX spreads, executable attributes or
+style-capable elements. The chosen source profile therefore permits only local
+CSS imports and one parameterless default-exported function returning a static
+tree of reviewed intrinsic tags and literal attributes. Parser errors and every
+unknown AST form fail. Python resolves each import to inspected CSS, requires
+the generated token sheet and checks classes against the conservative base-rule
+index. The TypeScript 6.0.3 sidecar is lockfile-pinned and only parses supplied
+source; the core package has no mandatory Node dependency.
+
+The local integration verifier constructs a temporary opt-in project, checks a
+passing component, then mutates imports, classes, tags, attributes, expressions
+and executable statements to require nonzero exits. It also verifies missing
+Node fails closed and passing source bytes remain unchanged. This is a static
+component-source adapter. The HTML gate still rejects module scripts, and a
+React entrypoint, transitive component graph, built bundle and browser behavior
+are not yet certified.
+
+Independent panel review found three ways the first TSX version could give a
+misleading pass: a bare `@jsx` factory pragma, an `amd-dependency` triple-slash
+directive, and a spoofed `node` earlier on `PATH`. The parser now rejects all
+triple-slash directives and JSX compiler pragmas. The runner uses only an
+explicit trusted absolute `ADSF_NODE_BIN`. The panel also found that reporting
+sidecar and lock hashes did not pin them; the manifest now requires reviewed
+hashes, checked before launch, and the integration verifier fixes those values
+and the contract fingerprint independently. Installed TypeScript package and
+entrypoint bytes are checked against reviewed hashes after `npm ci`. Adversarial
+tests cover these corrections. The panel re-reviewed the narrow source profile
+and found no remaining concrete false pass within it.
+
+This remains a source-checkout opt-in: a built wheel contains the sidecar and
+lock but not `node_modules`, and the documented `npm ci` command targets the
+checkout. The local checks do not establish a React app or rendered design.

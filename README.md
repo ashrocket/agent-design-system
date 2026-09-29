@@ -17,6 +17,10 @@ non-excluded CSS under a reviewed root, checks generated-token parity, and flags
 every other uninspected file unless explicitly excluded. Static HTML class names
 must have simple base rules in directly linked, inspected CSS. CI pins the example
 contract fingerprint.
+An opt-in static TSX component profile uses a separately installed, pinned
+TypeScript parser. It accepts a deliberately small JSX syntax and links class
+names to directly imported, inspected CSS. See the [source gate guide](docs/assistant-enforcement.md)
+for setup and limits; this does not certify a React build or browser result.
 
 The repository also includes an optional, budget-gated nightly research harness.
 It asks one small question about the format, records evidence and proposals for

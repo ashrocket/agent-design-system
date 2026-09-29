@@ -179,3 +179,55 @@ those holes but does not approve their contents. The HTML inventory is bounded;
 it does not validate arbitrary HTML syntax, runtime DOM changes, utility class
 semantics, component reuse, or accessibility. Browser and app-level review are
 still required for those claims.
+
+## Optional static TSX source profile
+
+The project manifest may add a `tsx` object with `profile: "static-jsx-v1"`
+and reviewed SHA-256 values for the adapter script and package lock. Install the
+optional parser from a source checkout before running that gate, and select a
+trusted absolute Node executable outside the assistant's project `PATH`:
+
+```sh
+npm ci --prefix src/agent_design_system/adapters/tsx --ignore-scripts --no-audit --no-fund
+export ADSF_NODE_BIN="$(command -v node)"
+python -m agent_design_system project-check PATH/TO/project.json --format json
+python scripts/verify-tsx-workflow.py
+```
+
+The manifest fields are `adapter_sha256` and `lock_sha256`; calculate reviewed
+values with `shasum -a 256` on `check.cjs` and `package-lock.json` in the adapter
+directory, then hold the resulting manifest/system fingerprint outside agent
+write access. The gate compares adapter and lock bytes with the manifest, and
+installed TypeScript package and entrypoint bytes with reviewed package hashes,
+before launching Node. CI pins adapter and lock hashes independently in the TSX
+workflow verifier.
+The source checkout's `npm ci` location is required: a wheel includes the
+sidecar and lock, but not `node_modules` or a writable parser-install directory.
+
+The sidecar uses TypeScript 6.0.3 from an exact npm lock and checks syntax with
+the [TypeScript Compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API).
+It parses source as data; it does not execute project code, use the network, or
+invoke a model. Python remains the policy authority and validates the sidecar's
+protocol, parser version, source hash and response shape. A missing or wrong
+parser, timeout, malformed result, hash drift or parse diagnostic fails closed.
+Reports include source, adapter and lockfile hashes. The core Python package remains
+dependency-free when TSX is not enabled.
+
+The accepted file profile has only relative, side-effect `.css` imports and one
+named, default-exported, parameterless function with a single return of static
+JSX. It requires an exact generated-token CSS import and a `className` on every
+JSX element. Every literal `className`
+token must have a nonempty simple base rule in CSS imported by that file and
+inspected by the project gate. JSX accepts only a small set of ordinary HTML
+tags and inert quoted attributes. It rejects arbitrary statements, runtime
+expressions, spreads, custom components, inline styling, event/ref props,
+style-capable tags, JavaScript/TypeScript imports, compiler pragmas, and entity
+or escape spellings that could change a class name. These restrictions follow
+from [JSX's support for expressions, spreads and custom components](https://www.typescriptlang.org/docs/handbook/jsx.html),
+which would otherwise leave executable styling outside this profile.
+
+A passing TSX result means only that the inspected static component source met
+this profile. The project gate still rejects ordinary JavaScript/TypeScript and
+does not verify a React entrypoint, imported component graph, bundler output,
+browser loading, computed styles or runtime mutations. Work toward a real app
+PASS must close those paths and verify the built behavior separately.

@@ -464,6 +464,16 @@ class ProjectTests(unittest.TestCase):
         )
         jsonschema.Draft202012Validator.check_schema(schema)
         jsonschema.validate(load_json(self.manifest_path), schema)
+        enabled = load_json(self.manifest_path)
+        enabled["tsx"] = {
+            "profile": "static-jsx-v1",
+            "adapter_sha256": "a" * 64,
+            "lock_sha256": "b" * 64,
+        }
+        jsonschema.validate(enabled, schema)
+        enabled["tsx"]["profile"] = "permissive"
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate(enabled, schema)
         fingerprint = self.report()["contract_sha256"]
 
         def invoke(*args: str) -> tuple[int, str]:
