@@ -1,0 +1,13 @@
+{
+  "format": "adsf-css-project",
+  "version": "0.1.0",
+  "root": "rendered-react-source",
+  "system": "aurora.design-system.json",
+  "tokens": "tokens.css",
+  "exclusions": [],
+  "tsx": {
+    "profile": "static-jsx-v1",
+    "adapter_sha256": "362745c4ebe8743031eb07121b81766aeb26064e40f797378a2830653abd6318",
+    "lock_sha256": "27addf51ab3806b6e7cc4fa6506d80f782c93a71dba05ac3fcf5dcd78aad42a4"
+  }
+}

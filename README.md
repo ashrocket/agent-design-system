@@ -20,7 +20,7 @@ contract fingerprint.
 An opt-in static TSX component profile uses a separately installed, pinned
 TypeScript parser. It accepts a deliberately small JSX syntax and links class
 names to directly imported, inspected CSS. See the [source gate guide](docs/assistant-enforcement.md)
-for setup and limits; this does not certify a React build or browser result.
+for setup and limits. A separate [rendered React fixture](docs/assistant-enforcement.md#rendered-react-fixture) now checks one static component through a locked build and Chromium computed-style probe. Its tool-owned entry and HTML do not establish a general React-app pass.
 
 The repository also includes an optional, budget-gated nightly research harness.
 It asks one small question about the format, records evidence and proposals for

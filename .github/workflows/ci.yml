@@ -28,7 +28,9 @@ jobs:
       - name: Install optional static TSX parser
         run: npm ci --prefix src/agent_design_system/adapters/tsx --ignore-scripts --no-audit --no-fund
       - name: Select trusted Node binary for the optional parser
-        run: echo "ADSF_NODE_BIN=$(command -v node)" >> "$GITHUB_ENV"
+        run: |
+          echo "ADSF_NODE_BIN=$(realpath "$(command -v node)")" >> "$GITHUB_ENV"
+          echo "ADSF_NPM_CLI=$(realpath "$(command -v npm)")" >> "$GITHUB_ENV"
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Check formatting
@@ -49,6 +51,17 @@ jobs:
         run: python scripts/verify-project-workflow.py
       - name: Verify static TSX source profile
         run: python scripts/verify-tsx-workflow.py
+      - name: Install rendered React fixture tools
+        if: matrix.python-version == '3.11'
+        run: npm ci --prefix scripts/react-fixture --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium for rendered fixture
+        if: matrix.python-version == '3.11'
+        run: node scripts/react-fixture/node_modules/playwright-core/cli.js install --with-deps chromium
+      - name: Verify source-to-browser React fixture
+        if: matrix.python-version == '3.11'
+        run: |
+          python scripts/verify-rendered-react-workflow.py --output "$RUNNER_TEMP/adsf-react-fixture"
+          node scripts/react-fixture/browser-verify.cjs "$RUNNER_TEMP/adsf-react-fixture"
       - name: Verify failing example fails
         run: |
           if adsys check examples/aurora.design-system.json examples/button.invalid.json; then

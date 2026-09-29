@@ -1,0 +1,15 @@
+{
+  "name": "@adsf/rendered-react-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional deterministic build and browser-validation fixture for ADSF static TSX source",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "esbuild": "0.28.2",
+    "playwright-core": "1.63.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

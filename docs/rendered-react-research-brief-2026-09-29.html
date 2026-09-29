@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>From design rules to rendered proof — ADSF research brief</title>
+  <style>
+    :root { --ink:#17263a; --muted:#51627a; --blue:#2563eb; --soft:#edf4ff; --line:#d8e2ef; --red:#d62b45; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(135deg,#e6effa 0%,#f4f7fb 46%,#e9eef7 100%); color:var(--ink); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:930px; margin:36px auto; background:#fff; box-shadow:0 22px 70px #2139561c; border:1px solid var(--line); border-radius:22px; overflow:hidden; }
+    header { padding:46px 56px 42px; background:linear-gradient(138deg,#10243e 0%,#193d72 65%,#1d55a4 100%); color:#fff; }
+    .eyebrow { margin:0 0 18px; color:#a9ceff; text-transform:uppercase; font-weight:800; font-size:12px; letter-spacing:.16em; }
+    h1 { max-width:700px; margin:0; font:700 clamp(2.4rem,6vw,4rem)/1.05 Georgia,"Times New Roman",serif; letter-spacing:-.045em; }
+    .lede { max-width:710px; margin:20px 0 0; color:#e2edff; font-size:1.15rem; line-height:1.5; }
+    .pill { display:inline-block; margin-top:24px; padding:7px 12px; border-radius:999px; border:1px solid #a7c8fa88; background:#ffffff1b; font-size:12px; font-weight:750; letter-spacing:.02em; }
+    .body { padding:36px 56px 40px; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 32px; }
+    .metric { padding:19px; border:1px solid var(--line); border-radius:14px; background:#f8fbff; min-height:112px; }
+    .metric strong { display:block; color:#174ea6; font:700 2rem/1.1 Georgia,serif; }
+    .metric span { display:block; margin-top:7px; color:var(--muted); font-size:13px; line-height:1.35; }
+    section { border-top:1px solid var(--line); padding-top:24px; margin-top:24px; }
+    h2 { margin:0 0 11px; font:700 1.43rem/1.2 Georgia,serif; letter-spacing:-.015em; }
+    p { margin:0 0 13px; } p:last-child { margin-bottom:0; }
+    .callout { padding:17px 20px; margin:18px 0; border-left:4px solid var(--blue); border-radius:0 11px 11px 0; background:var(--soft); font-weight:650; }
+    .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:17px 0; font-size:13px; font-weight:750; color:#2656a4; }
+    .flow span { padding:8px 11px; background:#f2f7ff; border:1px solid #cadbfa; border-radius:9px; }
+    .flow b { color:#95a8c3; }
+    .proof { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:17px 0; }
+    .state { padding:18px; border-radius:13px; border:1px solid var(--line); background:#fbfdff; }
+    .state em { display:block; font-size:12px; font-style:normal; color:var(--muted); font-weight:750; text-transform:uppercase; letter-spacing:.08em; }
+    .sample { display:flex; align-items:center; gap:11px; margin-top:12px; font-size:13px; color:#354a66; }
+    .swatch { width:30px; height:30px; border-radius:9px; box-shadow:0 2px 6px #152b4225; }
+    .blue { background:var(--blue); } .red { background:var(--red); }
+    code { padding:1px 4px; border-radius:4px; background:#eef3f9; font:.87em/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    a { color:#164da3; text-decoration-thickness:1px; text-underline-offset:2px; }
+    footer { margin-top:27px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media(max-width:680px) { body{background:#fff;} main{margin:0;border:0;border-radius:0;box-shadow:none;} header{padding:33px 23px;} .body{padding:27px 23px 35px;} .metrics,.proof{grid-template-columns:1fr;} .metric{min-height:0;} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Agent Design System / research brief / 29 September 2026</p>
+    <h1>From design rules to rendered proof</h1>
+    <p class="lede">A coding assistant can follow a design-system prompt and still ship the wrong color. The useful test is whether independent tools catch the source change, the built asset, and what the browser actually displays.</p>
+    <span class="pill">Research checkpoint · local validation passed · app-wide coverage remains open</span>
+  </header>
+  <div class="body">
+    <div class="metrics" aria-label="Verified local results">
+      <div class="metric"><strong>109</strong><span>unit tests passed</span></div>
+      <div class="metric"><strong>9</strong><span>normative conformance cases passed</span></div>
+      <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
+    </div>
+    <section>
+      <h2>The enforcement path</h2>
+      <p class="callout">The core principle: give assistants an explicit contract, then verify their output independently. The runtime rule engine is deterministic, read-only when checking, and has no model or network dependency.</p>
+      <div class="flow" aria-label="Verification chain"><span>Approved tokens</span><b>→</b><span>Source gate</span><b>→</b><span>Locked build</span><b>→</b><span>Browser probe</span></div>
+      <p>The project gate inventories files under a declared root, checks token-sheet parity, rejects uninspected source, and binds static JSX class names to directly imported, inspected CSS. The new fixture carries those exact inspected bytes into a fixed React build and permits only the expected source, runtime modules, and three output files.</p>
+    </section>
+    <section>
+      <h2>What the browser proved</h2>
+      <p>Chromium mounted one visible button, loaded the attested stylesheet, kept the approved token <code>#2563eb</code>, and computed the button background as <code>rgb(37, 99, 235)</code>. The browser requested only the expected HTML, JavaScript, and CSS.</p>
+      <div class="proof" aria-label="Browser mutation experiment">
+        <div class="state"><em>Approved response</em><div class="sample"><span class="swatch blue" aria-hidden="true"></span><span>Blue button · accepted</span></div></div>
+        <div class="state"><em>CSS response changed</em><div class="sample"><span class="swatch red" aria-hidden="true"></span><span>Red button · rejected by the same style assertion</span></div></div>
+      </div>
+      <p>The red override changed only the served CSS response. Source files and on-disk build assets stayed unchanged. Separate negative checks caught a changed source byte, changed built CSS, and an extra emitted asset. Two builds from different local paths produced identical bytes.</p>
+    </section>
+    <section>
+      <h2>What remains open</h2>
+      <p>This is a rendered <strong>static component fixture</strong>. The HTML shell and React mount are trusted tool-owned code, so an ordinary app’s entrypoint, component graph, server, interactions, and full visual behavior are not yet covered. The new GitHub CI step is wired but has not been observed running remotely.</p>
+      <p>The next product test is a small protected pilot app: an assistant makes one approved design edit and one forbidden edit; CI must accept the first and reject the second while policy, verifier, and fingerprint remain independently controlled. That will measure the real problem: assistants staying inside the system as they edit application code.</p>
+    </section>
+    <footer>Local evidence: 109 unit tests, nine conformance cases, Ruff, mypy, actionlint, source and build verifiers, and a Chromium probe. A temporary fixed output repaired the invalid example’s three errors; its accessibility warning remains. <a href="https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API">TypeScript parser reference</a> · <a href="https://playwright.dev/docs/ci">Browser automation reference</a>. No push or remote CI run is claimed.</footer>
+  </div>
+</main>
+</body>
+</html>

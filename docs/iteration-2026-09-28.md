@@ -216,3 +216,36 @@ and found no remaining concrete false pass within it.
 This remains a source-checkout opt-in: a built wheel contains the sidecar and
 lock but not `node_modules`, and the documented `npm ci` command targets the
 checkout. The local checks do not establish a React app or rendered design.
+
+## Sixth iteration: source to rendered React fixture
+
+The panel chose a constrained browser proof before calling any React app
+compliant. It rejected a bare bundle-hash pass because the bundle could omit
+inspected CSS or differ from what the browser loads. The fixture now gates a
+static `App.tsx` and its three CSS imports, compares a copied build snapshot to
+the source gate's per-file hashes, and runs a fixed React bootstrap through a
+fresh locked esbuild installation. The build report must contain only that
+source graph, the fixed bootstrap, and locked React runtime modules. The exact
+three output assets must match a second build from a different source path.
+Deliberate source-byte drift, changed built CSS, and an extra output asset are
+required to fail verification.
+
+Chromium loads the attested HTML, JavaScript, and stylesheet from a local
+three-path server. The browser check requires one visible mounted button, the
+approved token and computed background, no page errors, and no unknown or
+external requests. A response-only red CSS override must cause the normal
+approved-color assertion to reject that browser observation, while the source
+and on-disk output hashes stay fixed. This probes one rendered property, not
+all possible styles or interactions.
+
+The independent panel found and the implementation addressed two early gaps:
+the copied source was initially not hash-bound to the source report, and Node
+and npm were initially selected from a mutable `PATH`. The final verifier
+requires explicit absolute executable paths and compares every copied file to
+the gate report. It also builds from a second source location to test local
+path independence. The panel judged the remaining scope honest only as a
+rendered **static component fixture**: the HTML shell and React mount are
+tool-owned constants, not an inspected app entry. A remote CI run is still
+unverified until GitHub reports one. The next product test is a protected pilot
+app where an assistant's forbidden style edit fails CI and an approved edit
+passes without allowing the assistant to revise the policy or verifier.
