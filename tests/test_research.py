@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -166,6 +168,130 @@ class ResearchTests(unittest.TestCase):
             self.assertEqual(entry["charged_tokens"], 9000)
             envelope = json.loads(Path(entry["result_path"]).read_text())
             self.assertIn("usage input_tokens", envelope["error"])
+
+    def test_unhashable_result_field_still_settles_known_higher_usage(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        result = {
+            "run_id": plan["run_id"],
+            "question_id": plan["question_id"],
+            "summary": "One finding.",
+            "evidence": [],
+            "proposals": [
+                {
+                    "title": "Candidate",
+                    "rationale": "Reason",
+                    "compatibility": [],
+                    "changes": [],
+                }
+            ],
+            "risks": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            reserve_run(plan, ledger)
+            entry = record_run(
+                plan,
+                json.dumps(result),
+                status="success",
+                ledger_path=ledger,
+                results_dir=Path(directory) / "results",
+                usage={"input_tokens": 15000, "output_tokens": 1000},
+            )
+            self.assertEqual(entry["status"], "invalid")
+            self.assertEqual(entry["charged_tokens"], 16000)
+            self.assertEqual(load_ledger(ledger)[0], entry)
+            self.assertEqual(len(ledger.read_text().splitlines()), 2)
+
+    def test_artifact_write_failure_still_settles_known_higher_usage(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        result = {
+            "run_id": plan["run_id"],
+            "question_id": plan["question_id"],
+            "summary": "One finding.",
+            "evidence": [],
+            "proposals": [],
+            "risks": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ledger = root / "ledger.jsonl"
+            blocked_results = root / "existing-file"
+            blocked_results.write_text("not a directory")
+            reserve_run(plan, ledger)
+            entry = record_run(
+                plan,
+                json.dumps(result),
+                status="success",
+                ledger_path=ledger,
+                results_dir=blocked_results,
+                usage={"input_tokens": 15000, "output_tokens": 1000},
+            )
+            self.assertEqual(entry["status"], "failed")
+            self.assertEqual(entry["charged_tokens"], 16000)
+            self.assertIsNone(entry["result_path"])
+            self.assertIn("artifact_error", entry)
+            self.assertEqual(load_ledger(ledger)[0], entry)
+
+    def test_record_rejects_traversal_run_id_before_writing(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        plan["run_id"] = "../escaped"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(FormatError, "safe format"):
+                record_run(
+                    plan,
+                    "",
+                    status="failed",
+                    ledger_path=root / "ledger.jsonl",
+                    results_dir=root / "results",
+                )
+            self.assertFalse((root / "escaped.json").exists())
+            self.assertFalse((root / "ledger.jsonl").exists())
+
+    def test_result_write_does_not_follow_predictable_temp_symlink(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            results = root / "results"
+            results.mkdir()
+            unrelated = root / "unrelated.txt"
+            unrelated.write_text("preserve this")
+            (results / f"{plan['run_id']}.json.tmp").symlink_to(unrelated)
+            entry = record_run(
+                plan,
+                "",
+                status="failed",
+                ledger_path=root / "ledger.jsonl",
+                results_dir=results,
+            )
+            self.assertEqual(unrelated.read_text(), "preserve this")
+            self.assertTrue((results / f"{plan['run_id']}.json.tmp").is_symlink())
+            self.assertEqual(
+                json.loads(Path(entry["result_path"]).read_text())["charged_tokens"],
+                9000,
+            )
+
+    def test_cli_reserve_command_charges_before_remote_agent_job(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan_path = root / "plan.json"
+            ledger_path = root / "ledger.jsonl"
+            plan_path.write_text(json.dumps(plan))
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = main(
+                    [
+                        "research",
+                        "reserve",
+                        "--plan",
+                        str(plan_path),
+                        "--ledger",
+                        str(ledger_path),
+                    ]
+                )
+            self.assertEqual(code, 0)
+            self.assertEqual(load_ledger(ledger_path)[0]["status"], "reserved")
+            self.assertEqual(len(ledger_path.read_text().splitlines()), 1)
 
     def test_record_is_idempotent_by_run_id(self) -> None:
         plan = make_plan(self.budget, self.questions, [], now=self.now)

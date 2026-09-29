@@ -107,6 +107,14 @@ def main() -> None:
         )
         tokens.write_bytes(approved)
 
+        second = app / "second.html"
+        second.write_text('<!doctype html><link rel="stylesheet" href="layout.css">')
+        assert any(
+            issue["path"] == "second.html" and issue["code"] == "tokens-unreferenced"
+            for issue in check(manifest, expected=1)["issues"]
+        )
+        second.unlink()
+
         index = app / "index.html"
         index.write_text(
             index.read_text().replace(

@@ -39,6 +39,8 @@ UNVERIFIED_SUFFIXES = {
     ".tsx",
     ".twig",
     ".vue",
+    ".xht",
+    ".xhtml",
 }
 PRESENTATION_ATTRIBUTES = {
     "align",
@@ -351,12 +353,12 @@ def check_project(
 
     scan(root)
     inspected = {item["path"] for item in files}
-    referenced_tokens = False
     html_sources: list[dict[str, Any]] = []
     for name, source, digest in html:
         parser = _HTMLCoverage(name, issues)
         parser.feed(source)
         parser.close()
+        referenced_tokens = False
         html_sources.append(
             {"path": name, "sha256": digest, "stylesheets": list(parser.stylesheets)}
         )
@@ -399,13 +401,13 @@ def check_project(
                     "stylesheet-unverified",
                     f"stylesheet was not inspected: {href}",
                 )
-    if html and not referenced_tokens:
-        _issue(
-            issues,
-            manifest["tokens"],
-            "tokens-unreferenced",
-            "no static HTML file references the generated token stylesheet",
-        )
+        if not referenced_tokens:
+            _issue(
+                issues,
+                name,
+                "tokens-unreferenced",
+                "static HTML page does not reference the generated token stylesheet",
+            )
     coverage = {
         "css_files": len(files),
         "css_declarations": sum(item["coverage"]["declarations"] for item in files),

@@ -13,7 +13,7 @@ The source gate catches literal values, unapproved tokens and local variable
 overrides in inspected CSS. See [the assistant workflow](docs/assistant-enforcement.md)
 for the contract, repair loop and source-coverage limits.
 For a project, `adsys project-check examples/assistant-app.project.json` discovers
-all authored CSS under a reviewed root, checks generated-token parity, and flags
+non-excluded CSS under a reviewed root, checks generated-token parity, and flags
 unsupported styling sources. CI pins the example contract fingerprint.
 
 The repository also includes an optional, budget-gated nightly research harness.

@@ -107,6 +107,22 @@ class ProjectTests(unittest.TestCase):
             "tokens-unreferenced", [item["code"] for item in self.report()["issues"]]
         )
 
+    def test_each_html_page_must_reference_generated_tokens(self) -> None:
+        second = self.app / "second.html"
+        second.write_text(
+            '<!doctype html><html><head><link rel="stylesheet" href="layout.css"></head><body></body></html>'
+        )
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertIn(
+            {
+                "path": "second.html",
+                "code": "tokens-unreferenced",
+                "message": "static HTML page does not reference the generated token stylesheet",
+            },
+            report["issues"],
+        )
+
     def test_inline_external_and_unsupported_sources_fail_coverage(self) -> None:
         index = self.app / "index.html"
         index.write_text(
@@ -120,11 +136,14 @@ class ProjectTests(unittest.TestCase):
         )
         (self.app / "app.tsx").write_text("export const App = () => null")
         (self.app / "icon.svg").write_text("<svg></svg>")
+        (self.app / "other.xhtml").write_text(
+            "<html><style>button{color:red}</style></html>"
+        )
         codes = [item["code"] for item in self.report()["issues"]]
         self.assertIn("html-unverified-attribute", codes)
         self.assertIn("html-unverified-element", codes)
         self.assertIn("stylesheet-unverified", codes)
-        self.assertEqual(codes.count("adapter-required"), 2)
+        self.assertEqual(codes.count("adapter-required"), 3)
 
     def test_base_rebasing_and_duplicate_link_attributes_fail(self) -> None:
         index = self.app / "index.html"

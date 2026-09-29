@@ -139,6 +139,13 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--at", help="ISO-8601 report time; defaults to now")
     status.set_defaults(handler=_research_status)
 
+    reserve = research_commands.add_parser(
+        "reserve", help="durably charge a planned run before starting an agent"
+    )
+    reserve.add_argument("--plan", required=True)
+    reserve.add_argument("--ledger", default="research/ledger.jsonl")
+    reserve.set_defaults(handler=_research_reserve)
+
     record = research_commands.add_parser(
         "record", help="record an attempted research run"
     )
@@ -438,6 +445,13 @@ def _research_status(args: argparse.Namespace) -> int:
         load_json(args.budget), load_ledger(args.ledger), parse_time(args.at)
     )
     print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+def _research_reserve(args: argparse.Namespace) -> int:
+    with ledger_lock(args.ledger):
+        entry = reserve_run(load_json(args.plan), args.ledger)
+    print(json.dumps(entry, indent=2, sort_keys=True))
     return 0
 
 

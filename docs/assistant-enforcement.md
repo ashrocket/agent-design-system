@@ -112,8 +112,9 @@ adapters, app-level coverage and browser verification.
 ## Project-wide source gate
 
 `adsys project-check` reads an `adsf-css-project` manifest. It discovers every
-CSS file under `root` (including uppercase `.CSS`), checks the generated token
-stylesheet byte for byte, and reports each file's SHA-256 and declaration count.
+non-excluded CSS file under `root` (including uppercase `.CSS`), checks the
+generated token stylesheet byte for byte, and reports each file's SHA-256 and
+declaration count.
 The [fixture manifest](../examples/assistant-app.project.json) points to a
 small HTML app with two authored CSS files. Its paths are relative to the
 manifest directory, except `tokens` and each exclusion path, which are relative
@@ -141,12 +142,13 @@ discovered CSS and static HTML inventory met this limited contract. It does
 not prove browser loading or computed styles. An HTML stylesheet reference
 is evidence of a reference, not proof that a browser loaded it.
 
-Static HTML inspection rejects inline style attributes and tags, `<base>` URL
+Each static HTML page must reference the generated token stylesheet. Static
+HTML inspection rejects inline style attributes and tags, `<base>` URL
 rebasing, duplicate attributes, presentation
 attributes, scripts/event handlers, embedded SVG, and external or uninspected
 stylesheet references. JS, TS, JSX, TSX, CSS-in-JS candidates, preprocessors,
-Svelte, Vue, MDX, Astro, and standalone SVG are reported as unverified rather
-than silently passed. A project with any such source exits nonzero until an
+Svelte, Vue, MDX, Astro, XHTML, and standalone SVG are reported as unverified
+rather than silently passed. A project with any such source exits nonzero until an
 adapter is added or a reviewed exclusion is declared. The gate remains offline
 and read-only; invalid manifests or unsafe paths exit 2, while source drift,
 token mismatch, and unverified coverage exit 1.

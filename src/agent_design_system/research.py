@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import uuid
@@ -85,13 +86,9 @@ def load_ledger(path: str | Path) -> list[dict[str, Any]]:
 
 def reserve_run(plan: dict[str, Any], ledger_path: str | Path) -> dict[str, Any]:
     """Persist the minimum charge before the local agent process starts."""
-    if plan.get("decision") != "run":
-        raise FormatError("cannot reserve a skipped research plan")
+    reservation = _validate_run_plan(plan)
     if any(entry.get("run_id") == plan["run_id"] for entry in load_ledger(ledger_path)):
         raise FormatError("research run ID is already reserved or recorded")
-    reservation = int(plan["reserved_tokens"])
-    if reservation <= 0:
-        raise FormatError("research reservation must be positive")
     entry = {
         "run_id": plan["run_id"],
         "question_id": plan["question_id"],
@@ -122,6 +119,31 @@ def _append_ledger(
             os.fsync(directory_handle)
         finally:
             os.close(directory_handle)
+
+
+def _validate_run_plan(plan: dict[str, Any]) -> int:
+    if not isinstance(plan, dict) or plan.get("decision") != "run":
+        raise FormatError("cannot charge a skipped research plan")
+    if not isinstance(plan.get("run_id"), str) or not re.fullmatch(
+        r"[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}", plan["run_id"]
+    ):
+        raise FormatError("research run ID must match the generated safe format")
+    if not isinstance(plan.get("question_id"), str) or not plan["question_id"]:
+        raise FormatError("research question ID must be a non-empty string")
+    if not isinstance(plan.get("planned_at"), str):
+        raise FormatError("research planned_at must be an ISO timestamp")
+    try:
+        parse_time(plan["planned_at"])
+    except ValueError as error:
+        raise FormatError("research planned_at must be an ISO timestamp") from error
+    reservation = plan.get("reserved_tokens")
+    if (
+        isinstance(reservation, bool)
+        or not isinstance(reservation, int)
+        or reservation <= 0
+    ):
+        raise FormatError("research reservation must be a positive integer")
+    return reservation
 
 
 def budget_windows(config: dict[str, Any], now: datetime) -> list[BudgetWindow]:
@@ -239,21 +261,19 @@ def record_run(
     usage: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    if plan.get("decision") != "run":
-        raise FormatError("cannot record a skipped research plan")
+    reservation = _validate_run_plan(plan)
     for existing in load_ledger(ledger_path):
         if existing.get("run_id") == plan["run_id"]:
-            if existing.get("status") != "reserved":
-                return existing
             if (
                 existing.get("question_id") != plan["question_id"]
                 or existing.get("started_at") != plan["planned_at"]
-                or existing.get("reserved_tokens") != int(plan["reserved_tokens"])
+                or existing.get("reserved_tokens") != reservation
             ):
                 raise FormatError("research settlement does not match reservation")
+            if existing.get("status") != "reserved":
+                return existing
             break
     finished_at = (now or datetime.now(UTC)).astimezone(UTC)
-    reservation = int(plan["reserved_tokens"])
     usage_error: str | None = None
     try:
         actual_tokens = _usage_total(usage)
@@ -283,7 +303,6 @@ def record_run(
             normalized_status = "invalid"
 
     output_dir = Path(results_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     result_path = output_dir / f"{plan['run_id']}.json"
     result_payload: dict[str, Any] = {
         "plan": plan,
@@ -297,7 +316,13 @@ def record_run(
         result_payload["error"] = result_error
         if result_text:
             result_payload["raw_result"] = result_text[:32000]
-    _write_json(result_path, result_payload)
+    artifact_error: str | None = None
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(result_path, result_payload)
+    except (OSError, TypeError, ValueError) as error:
+        artifact_error = f"result artifact could not be written: {error}"
+        normalized_status = "failed"
 
     entry = {
         "run_id": plan["run_id"],
@@ -308,9 +333,11 @@ def record_run(
         "reserved_tokens": reservation,
         "actual_tokens": actual_tokens if actual_tokens else None,
         "charged_tokens": charged_tokens,
-        "result_path": str(result_path),
+        "result_path": None if artifact_error else str(result_path),
     }
-    _append_ledger(ledger_path, entry)
+    if artifact_error:
+        entry["artifact_error"] = artifact_error
+    _append_ledger(ledger_path, entry, durable=True)
     return entry
 
 
@@ -512,11 +539,9 @@ def _validate_research_result(result: Any, plan: dict[str, Any]) -> None:
         for field in ("title", "rationale"):
             if not isinstance(proposal[field], str) or not proposal[field].strip():
                 raise FormatError(f"{path}.{field} must be a non-empty string")
-        if proposal["compatibility"] not in {
-            "backwards-compatible",
-            "breaking",
-            "research-only",
-        }:
+        if not isinstance(proposal["compatibility"], str) or proposal[
+            "compatibility"
+        ] not in {"backwards-compatible", "breaking", "research-only"}:
             raise FormatError(f"{path}.compatibility is invalid")
         changes = proposal["changes"]
         if (
@@ -554,12 +579,31 @@ def _validate_string_object(value: Any, fields: set[str], path: str) -> None:
 
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    os.replace(temporary, path)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(
+                json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+            )
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory_handle = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_handle)
+        finally:
+            os.close(directory_handle)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _validate_configuration(

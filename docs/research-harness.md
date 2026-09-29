@@ -26,10 +26,7 @@ The preflight reservation is the hard local gate. It prevents starting work that
 would exceed a configured rolling window, but it is not an OpenAI account spend
 limit. Since an individual agent run can exceed its estimate, set reservations
 conservatively and configure provider-side project spend controls as a second
-boundary when using API billing. The separate GitHub plan/research/publish jobs
-still record after the model job; a canceled publish job can leave that remote
-attempt unrecorded. Treat the remote workflow as requiring operator audit until
-reservation is persisted on its state branch before the model job starts.
+boundary when using API billing.
 
 ## Local runner
 
@@ -61,11 +58,14 @@ says `skip`.
 read-only job, following the official GitHub Action guidance:
 <https://developers.openai.com/codex/github-action>.
 
-The key-bearing job has only `contents: read`; the final Codex step uses a
-read-only sandbox and cannot publish. A later job, which never receives the API
-key, records the reserved charge and pushes only the ledger/result envelope to
-`automation/research-state`. That branch backs an open pull request, so research
-never changes the default branch without human review.
+The keyless plan job first commits and pushes the reservation to
+`automation/research-state`. If that push fails, the model job cannot start.
+The key-bearing job has only `contents: read`; its Codex step uses a read-only
+sandbox and cannot publish. A later keyless job settles the attempt on the state
+branch. Cancellation or failure of that job leaves the minimum reservation
+charged. The branch backs an open pull request, so research never changes the
+default branch without human review. This sequence has passed local checks but
+has not been verified by a remote workflow run.
 
 The GitHub cron is fail-closed by default so publishing this repository cannot
 silently create a second budget ledger alongside a local scheduler. To use

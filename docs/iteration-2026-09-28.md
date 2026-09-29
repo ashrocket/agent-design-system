@@ -69,7 +69,10 @@ The reviewer then found two static-HTML bypasses: `<base href>` can rebase a
 relative token stylesheet, and duplicate `href` attributes can make parser and
 browser interpretations diverge. Both now fail with focused regressions. The
 HTML report lists inspected paths, hashes and stylesheet references; legacy
-presentational attributes also fail. The reviewer identified a handoff gap:
+presentational attributes also fail. Final review found that a second HTML page
+could omit the token sheet while the first satisfied a global reference check;
+the gate now checks token linkage on every page. The reviewer identified a
+handoff gap:
 the exported assistant context still told agents to check one chosen CSS file.
 It now accepts a reviewed project manifest and fingerprint, makes the pinned
 project command the primary handoff gate, and presents single-file checking as
@@ -92,17 +95,22 @@ on local Python 3.11. These are local results; no remote CI run is claimed.
 ## Remaining research and limits
 
 1. The gate needs adapters for JSX, utility classes, CSS-in-JS, SVG, framework
-   templates and browser-computed styles before those sources can pass without
-   reviewed exclusions. Component reuse and per-selector semantic intent remain
-   outside this bounded gate.
+   templates (including XHTML) and browser-computed styles before those sources
+   can pass without reviewed exclusions. Component reuse and per-selector
+   semantic intent remain outside this bounded gate.
 2. Independent review and branch protection must pin the manifest, contract and
    CI workflow; an assistant able to edit all of them could update its own pin.
 3. The local runner now appends and syncs a reservation before invoking Codex;
    a later settlement replaces it for budget calculations. A simulated
    interruption leaves the reservation charged, and malformed usage retains
-   the minimum charge. The separate GitHub research workflow still needs a
-   pre-agent remote reservation and cancellation audit. Current failed attempts
-   are accounted for, but no valid findings have been produced.
+   the minimum charge. Final safety review found an unhashable compatibility
+   field that could block settlement of known higher usage; this now becomes a
+   recorded invalid result. A result-artifact write failure now still settles
+   known usage. Run IDs are validated before path construction, and result
+   envelopes use a random, exclusive temporary file. The GitHub workflow now
+   pushes a reservation to its state branch before the agent job; remote run
+   behavior remains unverified. Current failed attempts are accounted for,
+   but no valid findings have been produced.
 
 Jev was unavailable in this session (no exposed tool or API credential), so the
 panel used direct code evidence. The MacBook worker readiness snapshot reported
@@ -113,3 +121,7 @@ repository tests. It held 249-254 numbered descriptors near a 256 soft limit,
 including many connector pipes, session files and database handles. This
 establishes process-local pressure but not whether retained idle sessions or a
 daemon leak is the root cause. No peer session was terminated.
+
+Final local verification after the panel fixes passed 98 unit tests, nine
+normative cases, both source-workflow verifiers, Ruff, mypy and `actionlint` for
+the revised nightly workflow. No GitHub run or deployment is claimed.
