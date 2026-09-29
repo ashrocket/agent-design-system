@@ -98,6 +98,16 @@ def main() -> None:
         )
         (app / "nested" / "new.CSS").unlink()
 
+        unknown = app / "new.oddstyle"
+        unknown.write_text("button { color: red; }")
+        unsupported = check(manifest, expected=1)
+        assert any(
+            issue["path"] == "new.oddstyle" and issue["code"] == "adapter-required"
+            for issue in unsupported["issues"]
+        )
+        assert len(unsupported["coverage"]["unverified_sources"][0]["sha256"]) == 64
+        unknown.unlink()
+
         tokens = app / "tokens.css"
         approved = tokens.read_bytes()
         tokens.write_bytes(approved.replace(b"16px", b"17px"))

@@ -14,7 +14,8 @@ overrides in inspected CSS. See [the assistant workflow](docs/assistant-enforcem
 for the contract, repair loop and source-coverage limits.
 For a project, `adsys project-check examples/assistant-app.project.json` discovers
 non-excluded CSS under a reviewed root, checks generated-token parity, and flags
-unsupported styling sources. CI pins the example contract fingerprint.
+every other uninspected file unless explicitly excluded. CI pins the example
+contract fingerprint.
 
 The repository also includes an optional, budget-gated nightly research harness.
 It asks one small question about the format, records evidence and proposals for

@@ -122,6 +122,30 @@ including many connector pipes, session files and database handles. This
 establishes process-local pressure but not whether retained idle sessions or a
 daemon leak is the root cause. No peer session was terminated.
 
-Final local verification after the panel fixes passed 98 unit tests, nine
+The local checkpoint after the panel fixes passed 98 unit tests, nine
 normative cases, both source-workflow verifiers, Ruff, mypy and `actionlint` for
 the revised nightly workflow. No GitHub run or deployment is claimed.
+
+## Third iteration: account for every project file
+
+The source gate previously recognized a fixed list of unsupported suffixes.
+An assistant could add a new file with an unfamiliar extension, or an
+extensionless file, and leave the project check green. The workflow and safety
+reviewers agreed that every non-excluded regular file needs a recorded outcome.
+
+The gate now inspects CSS and static HTML, trusts the manifest, system and
+generated token sheet only at their exact declared paths, and reports every
+other regular file as `adapter-required`. The report includes each unsupported
+file's path, suffix, size and SHA-256 when it is at most 64 MiB. Larger files
+retain an explicit `size-limit` hash status and still fail. CSS and HTML above
+8 MiB, scans deeper than 64 directories, and scans beyond 20,000 entries also
+fail closed. A fixture mutation proves an unfamiliar suffix fails; unit cases
+cover JSON, media, extensionless files, trusted exact paths and the limits.
+
+This makes coverage gaps visible but does not inspect their design content.
+Reviewed exclusions remain holes: their contents are neither scanned nor
+included in the contract fingerprint. A narrow root, independently reviewed
+exclusions and policy pins are still required. The next useful adapter should
+inspect a real application source format such as TSX with a parser, rather
+than trying to infer it from suffixes or string matching. No whole-app or
+browser-computed-style compliance is claimed from this checkpoint.

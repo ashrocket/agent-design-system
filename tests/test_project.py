@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import jsonschema
 
@@ -88,6 +89,75 @@ class ProjectTests(unittest.TestCase):
         )
         self.assertIn("css-color", [item["code"] for item in report["issues"]])
         self.assertEqual(path.read_bytes(), before)
+
+    def test_unknown_formats_and_assets_fail_with_hashed_inventory(self) -> None:
+        samples = {
+            "theme.oddstyle": b"button { color: red; }",
+            "settings.json": b'{"accent":"red"}',
+            "README": b"runtime style instructions",
+            "logo.png": b"not approved brand art",
+        }
+        for name, content in samples.items():
+            (self.app / name).write_bytes(content)
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(
+            [item["path"] for item in report["coverage"]["unverified_sources"]],
+            ["README", "logo.png", "settings.json", "theme.oddstyle"],
+        )
+        for item in report["coverage"]["unverified_sources"]:
+            self.assertEqual(len(item["sha256"]), 64)
+            self.assertEqual(item["bytes"], len(samples[item["path"]]))
+            self.assertIn(
+                {"path": item["path"], "code": "adapter-required"},
+                [
+                    {"path": issue["path"], "code": issue["code"]}
+                    for issue in report["issues"]
+                ],
+            )
+
+    def test_system_and_manifest_inside_root_are_trusted_by_exact_path(self) -> None:
+        self._manifest({"root": ".", "tokens": "assistant-app/tokens.css"})
+        report = self.report()
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(
+            [
+                (item["path"], item["role"])
+                for item in report["coverage"]["trusted_sources"]
+            ],
+            [
+                ("assistant-app.project.json", "manifest"),
+                ("assistant-app/tokens.css", "tokens"),
+                ("aurora.design-system.json", "system"),
+            ],
+        )
+
+    def test_excessive_source_and_scan_depth_fail_closed(self) -> None:
+        oversized = self.app / "oversized.css"
+        with oversized.open("wb") as handle:
+            handle.truncate(8 * 1024 * 1024 + 1)
+        self.assertIn(
+            "source-too-large", [item["code"] for item in self.report()["issues"]]
+        )
+        oversized.unlink()
+        huge_asset = self.app / "huge.bin"
+        with huge_asset.open("wb") as handle:
+            handle.truncate(64 * 1024 * 1024 + 1)
+        report = self.report()
+        item = report["coverage"]["unverified_sources"][0]
+        self.assertEqual(item["path"], "huge.bin")
+        self.assertIsNone(item["sha256"])
+        self.assertEqual(item["hash_status"], "size-limit")
+        huge_asset.unlink()
+        with patch("agent_design_system.project.MAX_SCAN_ENTRIES", 2):
+            with self.assertRaisesRegex(FormatError, "scan exceeds"):
+                self.report()
+        directory = self.app
+        for _ in range(65):
+            directory /= "a"
+            directory.mkdir()
+        with self.assertRaisesRegex(FormatError, "scan depth"):
+            self.report()
 
     def test_generated_token_parity_and_reference_are_required(self) -> None:
         token_file = self.app / "tokens.css"
@@ -225,6 +295,7 @@ class ProjectTests(unittest.TestCase):
         initial = self.report()["contract_sha256"]
         (self.app / "dist").mkdir()
         (self.app / "dist" / "drift.css").write_text(".x{color:red}")
+        (self.app / "dist" / "unknown.styler").write_text("color: red")
         self._manifest(
             {
                 "exclusions": [
@@ -246,6 +317,7 @@ class ProjectTests(unittest.TestCase):
             },
         )
         self.assertFalse(report["coverage"]["exclusions"][1]["present"])
+        self.assertEqual(report["coverage"]["unverified_sources"], [])
         self.assertIn(
             "contract-mismatch",
             [item["code"] for item in self.report(expected=initial)["issues"]],

@@ -113,8 +113,18 @@ adapters, app-level coverage and browser verification.
 
 `adsys project-check` reads an `adsf-css-project` manifest. It discovers every
 non-excluded CSS file under `root` (including uppercase `.CSS`), checks the
-generated token stylesheet byte for byte, and reports each file's SHA-256 and
-declaration count.
+generated token stylesheet byte for byte, and reports a SHA-256 and declaration
+count for each successfully inspected stylesheet. Rejected inputs have named
+issues.
+The manifest and system are trusted only at their exact declared paths; all
+other regular files receive an explicit outcome. Non-CSS/HTML files fail with
+`adapter-required` and a path, size, and streamed SHA-256 in the coverage
+report. Files over 64 MiB retain their path and size but show an explicit
+`size-limit` hash status. This includes JSX, JSON, Markdown, extensionless
+files, and media assets. An image can itself carry off-brand design, so a
+suffix alone is not an automatic exemption. Keep the root narrow and declare
+reviewed exclusions for assets or generated output that this adapter cannot
+inspect.
 The [fixture manifest](../examples/assistant-app.project.json) points to a
 small HTML app with two authored CSS files. Its paths are relative to the
 manifest directory, except `tokens` and each exclusion path, which are relative
@@ -146,17 +156,19 @@ Each static HTML page must reference the generated token stylesheet. Static
 HTML inspection rejects inline style attributes and tags, `<base>` URL
 rebasing, duplicate attributes, presentation
 attributes, scripts/event handlers, embedded SVG, and external or uninspected
-stylesheet references. JS, TS, JSX, TSX, CSS-in-JS candidates, preprocessors,
-Svelte, Vue, MDX, Astro, XHTML, and standalone SVG are reported as unverified
-rather than silently passed. A project with any such source exits nonzero until an
-adapter is added or a reviewed exclusion is declared. The gate remains offline
-and read-only; invalid manifests or unsafe paths exit 2, while source drift,
-token mismatch, and unverified coverage exit 1.
+stylesheet references. A project with any uninspected source or asset exits
+nonzero until an adapter is added or a reviewed exclusion is declared. The gate
+remains offline and read-only; invalid manifests or unsafe paths exit 2, while
+source drift, token mismatch, and unverified coverage exit 1. CSS and HTML
+inputs over 8 MiB, directory nesting beyond 64 levels, and scans over 20,000
+entries fail closed.
 
 The policy, manifest, exclusion reasons, expected fingerprint, and CI
 invocation all need independent review and branch protection. A fingerprint
 stored in editable source cannot stop an assistant from changing both the
-contract and its expected value. The HTML inventory is intentionally bounded;
+contract and its expected value. Excluded directory contents remain outside the
+gate and can change without changing the fingerprint; the report identifies
+those holes but does not approve their contents. The HTML inventory is bounded;
 it does not validate arbitrary HTML syntax, runtime DOM changes, utility class
 semantics, component reuse, or accessibility. Browser and app-level review are
 still required for those claims.

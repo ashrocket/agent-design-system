@@ -15,33 +15,10 @@ from urllib.parse import urlsplit
 from .css import enforce_css, render_tokens
 from .format import FormatError, load_json
 
-UNVERIFIED_SUFFIXES = {
-    ".astro",
-    ".cjs",
-    ".cts",
-    ".ejs",
-    ".erb",
-    ".hbs",
-    ".js",
-    ".jsx",
-    ".less",
-    ".liquid",
-    ".mjs",
-    ".mts",
-    ".mdx",
-    ".php",
-    ".sass",
-    ".scss",
-    ".styl",
-    ".svelte",
-    ".svg",
-    ".ts",
-    ".tsx",
-    ".twig",
-    ".vue",
-    ".xht",
-    ".xhtml",
-}
+MAX_SOURCE_BYTES = 8 * 1024 * 1024
+MAX_SCAN_DEPTH = 64
+MAX_SCAN_ENTRIES = 20_000
+MAX_UNVERIFIED_HASH_BYTES = 64 * 1024 * 1024
 PRESENTATION_ATTRIBUTES = {
     "align",
     "alink",
@@ -110,6 +87,28 @@ def _overlap(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
 
 def _issue(issues: list[dict[str, str]], path: str, code: str, message: str) -> None:
     issues.append({"path": path, "code": code, "message": message})
+
+
+def _hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _hash_unverified(path: Path, size: int) -> str | None:
+    if size > MAX_UNVERIFIED_HASH_BYTES:
+        return None
+    digest = hashlib.sha256()
+    remaining = MAX_UNVERIFIED_HASH_BYTES
+    with path.open("rb") as handle:
+        while chunk := handle.read(min(1024 * 1024, remaining + 1)):
+            if len(chunk) > remaining:
+                return None
+            digest.update(chunk)
+            remaining -= len(chunk)
+    return digest.hexdigest()
 
 
 class _HTMLCoverage(HTMLParser):
@@ -275,11 +274,18 @@ def check_project(
     files: list[dict[str, Any]] = []
     html: list[tuple[str, str, str]] = []
     unverified: list[str] = []
+    unverified_sources: list[dict[str, Any]] = []
+    trusted_sources: list[dict[str, str]] = []
     built_in: list[str] = []
     excluded_seen: set[tuple[str, ...]] = set()
+    scan_entries = 0
 
-    def scan(directory: Path) -> None:
+    def scan(directory: Path, depth: int = 0) -> None:
+        nonlocal scan_entries
         for entry in sorted(os.scandir(directory), key=lambda item: item.name):
+            scan_entries += 1
+            if scan_entries > MAX_SCAN_ENTRIES:
+                raise FormatError(f"project scan exceeds {MAX_SCAN_ENTRIES} entries")
             path = Path(entry.path)
             relative = path.relative_to(root).parts
             name = "/".join(relative)
@@ -301,16 +307,57 @@ def check_project(
                 excluded_seen.add(omitted)
                 continue
             if stat.S_ISDIR(mode):
-                scan(path)
+                if depth >= MAX_SCAN_DEPTH:
+                    raise FormatError(
+                        f"project scan depth exceeds {MAX_SCAN_DEPTH}: {name}"
+                    )
+                scan(path, depth + 1)
                 continue
             if not stat.S_ISREG(mode):
                 raise FormatError(f"special file in project root: {name}")
-            if path == token_file:
+            if path in {token_file, manifest_file, system_file}:
+                role = (
+                    "tokens"
+                    if path == token_file
+                    else "manifest"
+                    if path == manifest_file
+                    else "system"
+                )
+                trusted_sources.append(
+                    {"path": name, "role": role, "sha256": _hash_file(path)}
+                )
                 continue
             suffix = path.suffix.lower()
-            if suffix not in {".css", ".html", ".htm"} | UNVERIFIED_SUFFIXES:
+            if suffix not in {".css", ".html", ".htm"}:
+                size = entry.stat(follow_symlinks=False).st_size
+                digest = _hash_unverified(path, size)
+                unverified.append(name)
+                unverified_sources.append(
+                    {
+                        "path": name,
+                        "suffix": suffix,
+                        "bytes": size,
+                        "sha256": digest,
+                        "hash_status": "sha256" if digest else "size-limit",
+                    }
+                )
+                _issue(
+                    issues,
+                    name,
+                    "adapter-required",
+                    f"{suffix or 'extensionless'} source or asset needs an adapter or reviewed exclusion",
+                )
                 continue
-            content = path.read_bytes()
+            with path.open("rb") as handle:
+                content = handle.read(MAX_SOURCE_BYTES + 1)
+            if len(content) > MAX_SOURCE_BYTES:
+                _issue(
+                    issues,
+                    name,
+                    "source-too-large",
+                    f"source exceeds {MAX_SOURCE_BYTES} byte inspection limit",
+                )
+                continue
             digest = hashlib.sha256(content).hexdigest()
             try:
                 source = content.decode("utf-8")
@@ -340,16 +387,8 @@ def check_project(
                 )
                 for violation in result.violations:
                     _issue(issues, name, violation.rule_id, violation.message)
-            elif suffix in {".html", ".htm"}:
-                html.append((name, source, digest))
             else:
-                unverified.append(name)
-                _issue(
-                    issues,
-                    name,
-                    "adapter-required",
-                    f"{suffix} source needs a styling adapter",
-                )
+                html.append((name, source, digest))
 
     scan(root)
     inspected = {item["path"] for item in files}
@@ -415,6 +454,8 @@ def check_project(
         "html_files": len(html),
         "html_sources": html_sources,
         "unverified_files": unverified,
+        "unverified_sources": unverified_sources,
+        "trusted_sources": sorted(trusted_sources, key=lambda item: item["path"]),
         "exclusions": [
             {
                 "path": "/".join(parts),
