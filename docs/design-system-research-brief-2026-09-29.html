@@ -61,7 +61,7 @@
   <section>
     <h2>The new TSX boundary</h2>
     <p>The opt-in TSX profile uses the <a href="https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API">TypeScript Compiler API</a> to inspect a static JSX component. It permits local CSS imports and one static function. Every literal <code>className</code> must resolve to an inspected, directly imported CSS rule; the token sheet must also be imported.</p>
-    <p>The panel reproduced three bypasses: <code>@jsx</code> factory replacement, <code>amd-dependency</code> injection, and a fake <code>node</code> on <code>PATH</code>. All now fail. The runner requires an explicit trusted Node binary and verifies parser bytes, sidecar hash, lock hash, and a fixed contract fingerprint before accepting the result.</p>
+    <p>The panel reproduced three bypasses: <code>@jsx</code> factory replacement, <code>amd-dependency</code> injection, and a fake <code>node</code> on <code>PATH</code>. All now fail. The runner requires an explicit trusted Node binary and verifies parser, sidecar, and lock bytes. The CI verifier also holds a fixed contract fingerprint.</p>
   </section>
   <section>
     <h2>Verification and research record</h2>
@@ -73,7 +73,7 @@
     <p>TSX passing means only that static component source met this narrow profile. React entrypoints, transitive imports, bundles, browser styles, runtime changes, semantics, and accessibility remain unverified. Next: close the app graph and inspect the built behavior in a browser.</p>
     <p>Excluded files remain uninspected. The manifest, exclusions, hashes, fingerprint, and CI command need independent review. The optional parser currently installs in a source checkout; a wheel alone does not include <code>node_modules</code>.</p>
   </section>
-  <footer>Key files: <code>css.py</code>, <code>project.py</code>, <code>tsx.py</code>, <code>docs/assistant-enforcement.md</code>, and <code>docs/iteration-2026-09-28.md</code>. Local verification only; no push or browser-rendered review.</footer>
+  <footer>Key files: <code>css.py</code>, <code>project.py</code>, <code>tsx.py</code>, <code>docs/assistant-enforcement.md</code>, and <code>docs/iteration-2026-09-28.md</code>. This brief was visually reviewed in Chrome; the application was not. No push or remote CI run.</footer>
 </main>
 </body>
 </html>
