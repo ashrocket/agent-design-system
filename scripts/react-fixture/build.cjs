@@ -1,16 +1,14 @@
 "use strict";
 
-// A tool-owned, fixed build recipe. Project scripts, configs, and plugins are never loaded.
+// A tool-owned recipe that builds reviewed, app-authored entry and host files.
 const { createHash } = require("node:crypto");
-const { realpathSync } = require("node:fs");
+const { realpathSync, readFileSync } = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const esbuild = require("esbuild");
 
 const MAX_INPUT = 4096;
 const MAX_OUTPUT = 4 * 1024 * 1024;
-const BOOTSTRAP = 'import { createRoot } from "react-dom/client";\nimport App from "./App.tsx";\ncreateRoot(document.getElementById("root")).render(<App />);\n';
-const HTML = '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'self\'; style-src \'self\'; connect-src \'none\'; img-src \'none\'; font-src \'none\'; base-uri \'none\'; form-action \'none\'">\n<title>ADSF rendered source fixture</title>\n<link rel="stylesheet" href="./app.css">\n</head>\n<body>\n<div id="root"></div>\n<script type="module" src="./app.js"></script>\n</body>\n</html>\n';
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -29,10 +27,12 @@ async function main() {
       Object.keys(request).join(",") !== "root" || typeof request.root !== "string" ||
       !path.isAbsolute(request.root)) throw new Error("invalid build request");
   const root = realpathSync(request.root);
+  const entry = readFileSync(path.join(root, "main.tsx"));
+  const host = readFileSync(path.join(root, "index.html"));
   const outputRoot = path.join(os.tmpdir(), "adsf-in-memory-output");
   const result = await esbuild.build({
     absWorkingDir: root,
-    stdin: { contents: BOOTSTRAP, resolveDir: root, sourcefile: "__adsf_entry.tsx", loader: "tsx" },
+    entryPoints: [path.join(root, "main.tsx")],
     bundle: true,
     packages: "bundle",
     platform: "browser",
@@ -51,7 +51,7 @@ async function main() {
     logLevel: "silent",
   });
   if (result.warnings.length) throw new Error("build emitted warnings");
-  const files = [{ name: "index.html", bytes: Buffer.from(HTML, "utf8") }];
+  const files = [{ name: "index.html", bytes: host }];
   for (const file of result.outputFiles || []) {
     const name = path.basename(file.path);
     if (!file.path.startsWith(outputRoot + path.sep) || !["app.js", "app.css"].includes(name)) {
@@ -70,7 +70,8 @@ async function main() {
     builder_version: esbuild.version,
     react_version: require("react/package.json").version,
     react_dom_version: require("react-dom/package.json").version,
-    bootstrap_sha256: sha256(Buffer.from(BOOTSTRAP, "utf8")),
+    entry_sha256: sha256(entry),
+    host_sha256: sha256(host),
     metafile: result.metafile,
     files: files.map((item) => ({
       name: item.name,

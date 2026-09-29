@@ -249,3 +249,29 @@ tool-owned constants, not an inspected app entry. A remote CI run is still
 unverified until GitHub reports one. The next product test is a protected pilot
 app where an assistant's forbidden style edit fails CI and an approved edit
 passes without allowing the assistant to revise the policy or verifier.
+
+### Authored-entry extension, 29 September
+
+The next fixture revision moves `index.html` and `main.tsx` into the app source
+root. The optional `pinned-react-entry-v1` profile requires exact host and entry
+hashes in the manifest; neither may be excluded. The project gate inventories
+them separately from the statically inspected `App.tsx` and CSS. The pinned
+builder consumes the authored `main.tsx`, copies the checked host bytes, and
+must show all five bundled source inputs in its metafile; the host is checked
+separately. The trusted Python verifier writes artifact hashes to a fresh
+external attestation, which
+the browser verifier checks before serving exactly three assets.
+The panel found that the standalone project gate could otherwise accept
+updated host/entry pins in a changed manifest. It now requires an external
+expected contract fingerprint whenever the app profile is enabled. Browser
+provenance still depends on the protected verifier-to-attestation handoff.
+
+Focused negative tests rejected host and entry tampering, excluded pinned
+sources, changed manifest pins under the external contract fingerprint, and an
+extra source file. A controlled compliant edit changed button text to “Review
+now” and padding from the approved `--space-3` to `--space-4` token. The source
+gate, two path-independent builds, artifact attestation, and Chromium all
+passed; Chromium observed 16px padding and the new text. A response-only red
+override still failed the approved-style assertion. The profile remains fixed
+to one static app shape. It has not yet measured a blind assistant edit or a
+remote exact-SHA CI run.

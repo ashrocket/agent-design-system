@@ -60,8 +60,8 @@ jobs:
       - name: Verify source-to-browser React fixture
         if: matrix.python-version == '3.11'
         run: |
-          python scripts/verify-rendered-react-workflow.py --output "$RUNNER_TEMP/adsf-react-fixture"
-          node scripts/react-fixture/browser-verify.cjs "$RUNNER_TEMP/adsf-react-fixture"
+          python scripts/verify-rendered-react-workflow.py --output "$RUNNER_TEMP/adsf-react-fixture" --attestation "$RUNNER_TEMP/adsf-react-attestation.json"
+          node scripts/react-fixture/browser-verify.cjs "$RUNNER_TEMP/adsf-react-fixture" "$RUNNER_TEMP/adsf-react-attestation.json"
       - name: Verify failing example fails
         run: |
           if adsys check examples/aurora.design-system.json examples/button.invalid.json; then

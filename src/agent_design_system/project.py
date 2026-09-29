@@ -229,10 +229,10 @@ def check_project(
     if (
         not isinstance(manifest, dict)
         or not required.issubset(manifest)
-        or set(manifest) - required - {"tsx"}
+        or set(manifest) - required - {"tsx", "app"}
     ):
         raise FormatError(
-            "project manifest requires format, version, root, system, tokens, exclusions, and optional tsx only"
+            "project manifest requires format, version, root, system, tokens, exclusions, and optional tsx/app only"
         )
     if manifest["format"] != "adsf-css-project" or manifest["version"] != "0.1.0":
         raise FormatError("unsupported CSS project manifest format or version")
@@ -252,6 +252,28 @@ def check_project(
             raise FormatError(
                 "tsx requires the static-jsx-v1 profile and reviewed adapter and lock SHA-256 pins"
             )
+    app_enabled = "app" in manifest
+    if app_enabled:
+        if expected_sha256 is None:
+            raise FormatError(
+                "app profile requires an external expected contract SHA-256"
+            )
+        app_policy = manifest["app"]
+        if (
+            not tsx_enabled
+            or not isinstance(app_policy, dict)
+            or set(app_policy)
+            != {"profile", "host", "host_sha256", "entry", "entry_sha256"}
+            or app_policy["profile"] != "pinned-react-entry-v1"
+            or not all(
+                isinstance(app_policy[key], str)
+                and re.fullmatch(r"[0-9a-f]{64}", app_policy[key])
+                for key in ("host_sha256", "entry_sha256")
+            )
+        ):
+            raise FormatError(
+                "app requires pinned-react-entry-v1, tsx, and reviewed host/entry SHA-256 pins"
+            )
     base = manifest_file.parent.resolve(strict=True)
     root_parts = _relative(manifest["root"], "root", root=True)
     system_parts = _relative(manifest["system"], "system")
@@ -267,11 +289,37 @@ def check_project(
     token_file, token_exists = _declared(root, token_parts, "tokens", missing=True)
     if token_exists and not token_file.is_file():
         raise FormatError("tokens must be a regular file")
+    app_sources: dict[str, tuple[str, str]] = {}
+    if app_enabled:
+        host_parts = _relative(manifest["app"]["host"], "app host")
+        entry_parts = _relative(manifest["app"]["entry"], "app entry")
+        if (
+            not host_parts[-1].lower().endswith((".html", ".htm"))
+            or not entry_parts[-1].lower().endswith(".tsx")
+            or _overlap(host_parts, entry_parts)
+            or _overlap(host_parts, token_parts)
+            or _overlap(entry_parts, token_parts)
+        ):
+            raise FormatError(
+                "app host and entry must be distinct HTML/TSX files outside the token path"
+            )
+        for role, parts, pin in (
+            ("host", host_parts, manifest["app"]["host_sha256"]),
+            ("entry", entry_parts, manifest["app"]["entry_sha256"]),
+        ):
+            target, exists = _declared(root, parts, f"app {role}", missing=True)
+            if exists and not target.is_file():
+                raise FormatError(f"app {role} must be a regular file")
+            if target in {manifest_file, system_file}:
+                raise FormatError(f"app {role} cannot be the manifest or system")
+            app_sources["/".join(parts)] = (role, pin)
     raw_exclusions = manifest["exclusions"]
     if not isinstance(raw_exclusions, list):
         raise FormatError("exclusions must be a list")
     exclusions: list[tuple[tuple[str, ...], str, bool]] = []
     reserved: list[tuple[str, ...]] = [token_parts]
+    if app_enabled:
+        reserved.extend([host_parts, entry_parts])
     for protected in (manifest_file, system_file):
         try:
             reserved.append(protected.relative_to(root).parts)
@@ -333,6 +381,14 @@ def check_project(
             "tokens-stale",
             "generated token stylesheet differs byte for byte",
         )
+    for app_path, (role, _) in app_sources.items():
+        if not (root / app_path).is_file():
+            _issue(
+                issues,
+                app_path,
+                f"app-{role}-missing",
+                f"declared app {role} is missing",
+            )
 
     files: list[dict[str, Any]] = []
     html: list[tuple[str, str, str]] = []
@@ -340,6 +396,7 @@ def check_project(
     unverified: list[str] = []
     unverified_sources: list[dict[str, Any]] = []
     trusted_sources: list[dict[str, str]] = []
+    app_coverage: list[dict[str, str]] = []
     built_in: list[str] = []
     excluded_seen: set[tuple[str, ...]] = set()
     scan_entries = 0
@@ -426,6 +483,17 @@ def check_project(
                 )
                 continue
             digest = hashlib.sha256(content).hexdigest()
+            if name in app_sources:
+                role, expected = app_sources[name]
+                app_coverage.append({"path": name, "role": role, "sha256": digest})
+                if digest != expected:
+                    _issue(
+                        issues,
+                        name,
+                        f"app-{role}-drift",
+                        f"app {role} differs from its reviewed SHA-256 pin",
+                    )
+                continue
             try:
                 source = content.decode("utf-8")
                 if "\x00" in source:
@@ -626,6 +694,7 @@ def check_project(
         "unverified_files": unverified,
         "unverified_sources": unverified_sources,
         "trusted_sources": sorted(trusted_sources, key=lambda item: item["path"]),
+        "app_sources": sorted(app_coverage, key=lambda item: item["path"]),
         "exclusions": [
             {
                 "path": "/".join(parts),
@@ -638,7 +707,7 @@ def check_project(
         "built_in_exclusions": [
             {"path": path, "reason": "Git metadata"} for path in built_in
         ],
-        "scope": "authored CSS, static HTML, and opt-in static TSX source; not app runtime, computed browser styles, or component semantics",
+        "scope": "authored CSS, static HTML, opt-in static TSX, and exact pinned app host/entry bytes; not app runtime, computed browser styles, or component semantics",
     }
     if not files or not coverage["governed_declarations"]:
         _issue(

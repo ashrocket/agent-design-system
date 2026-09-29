@@ -501,5 +501,106 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(invoke()[0], 2)
 
 
+class PinnedReactEntryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.directory = Path(temporary.name).resolve()
+        self.manifest_path = self.directory / "rendered-react.project.json"
+        shutil.copy2(ROOT / "examples/rendered-react.project.json", self.manifest_path)
+        shutil.copy2(
+            ROOT / "examples/aurora.design-system.json",
+            self.directory / "aurora.design-system.json",
+        )
+        self.app = self.directory / "rendered-react-source"
+        shutil.copytree(ROOT / "examples/rendered-react-source", self.app)
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("optional static TSX parser needs Node")
+        patcher = patch.dict(os.environ, {"ADSF_NODE_BIN": str(Path(node).resolve())})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.fingerprint = (
+            "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859ac35"
+        )
+
+    def report(self) -> dict:
+        return check_project(self.manifest_path, expected_sha256=self.fingerprint)
+
+    def test_authored_host_and_entry_are_covered_and_read_only(self) -> None:
+        schema = load_json(
+            ROOT / "src/agent_design_system/schemas/project-manifest.schema.json"
+        )
+        jsonschema.validate(load_json(self.manifest_path), schema)
+        before = {
+            path.relative_to(self.directory): path.read_bytes()
+            for path in self.directory.rglob("*")
+            if path.is_file()
+        }
+        report = self.report()
+        self.assertEqual(report["status"], "pass")
+        with self.assertRaisesRegex(FormatError, "external expected contract"):
+            check_project(self.manifest_path)
+        self.assertEqual(
+            {
+                (item["path"], item["role"])
+                for item in report["coverage"]["app_sources"]
+            },
+            {("index.html", "host"), ("main.tsx", "entry")},
+        )
+        self.assertEqual(
+            before,
+            {
+                path.relative_to(self.directory): path.read_bytes()
+                for path in self.directory.rglob("*")
+                if path.is_file()
+            },
+        )
+
+    def test_host_and_entry_mutations_fail_even_when_other_sources_pass(self) -> None:
+        for name, injection, code in (
+            (
+                "index.html",
+                '<script src="https://evil.example/x.js"></script>',
+                "app-host-drift",
+            ),
+            ("main.tsx", '\nimport "./rogue.tsx";\n', "app-entry-drift"),
+        ):
+            with self.subTest(name=name):
+                path = self.app / name
+                original = path.read_text()
+                path.write_text(original + injection)
+                report = self.report()
+                self.assertEqual(report["status"], "fail")
+                self.assertIn(code, {item["code"] for item in report["issues"]})
+                path.write_text(original)
+
+    def test_pinned_sources_cannot_be_excluded_or_repointed(self) -> None:
+        original = json.loads(self.manifest_path.read_text())
+        for name in ("index.html", "main.tsx"):
+            with self.subTest(name=name):
+                changed = {
+                    **original,
+                    "exclusions": [{"path": name, "reason": "ignore"}],
+                }
+                self.manifest_path.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(FormatError, "reserved exclusion"):
+                    self.report()
+        changed = {**original, "app": {**original["app"], "host_sha256": "0" * 64}}
+        self.manifest_path.write_text(json.dumps(changed))
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertIn("contract-mismatch", {item["code"] for item in report["issues"]})
+        self.assertIn("app-host-drift", {item["code"] for item in report["issues"]})
+
+    def test_new_uninspected_source_fails_closed(self) -> None:
+        (self.app / "rogue.tsx").write_text("export const x = 'unreviewed';\n")
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertIn(
+            "rogue.tsx", [item["path"] for item in report["coverage"]["tsx_sources"]]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

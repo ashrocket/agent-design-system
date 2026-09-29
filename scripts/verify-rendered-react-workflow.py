@@ -1,4 +1,4 @@
-"""Build a source-gated static TSX component into a constrained React page."""
+"""Build an app-authored React entry from source-gated, pinned source files."""
 
 from __future__ import annotations
 
@@ -19,12 +19,19 @@ MANIFEST = ROOT / "examples/rendered-react.project.json"
 SYSTEM = ROOT / "examples/aurora.design-system.json"
 SOURCE = ROOT / "examples/rendered-react-source"
 BUILDER = ROOT / "scripts/react-fixture"
-CONTRACT_SHA256 = "a01c9b5d2d04570810be57e7c2e186e2422d2a7f55b2f6da51563f920cc320bd"
-BUILDER_SHA256 = "75871f3df4cdbc29f36b6f332a980ed23eb4bcea558d61bf48ab3c5854d91a8c"
+CONTRACT_SHA256 = "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859ac35"
+BUILDER_SHA256 = "7b1ba44ded6fb4eb87958da3df1245a44b68d6c1ddc455911fc3c0ca0c19e5ad"
 LOCK_SHA256 = "db2c3264f715b9358b6b2b5bd5d63c1f42ea3239fe36ddc3b892f7f39ce906e6"
 PACKAGE_SHA256 = "4ae3d06da8a18c2df3f5bf1b4bbff9bd7c3c02c85bc785301d75399446109e3c"
-BROWSER_SHA256 = "79f026e738de013fc2add9b8ae4294df05042669cd8e7dc969062af9ba15a533"
-SOURCE_FILES = {"App.tsx", "tokens.css", "layout.css", "components/button.css"}
+BROWSER_SHA256 = "9a876be5ad3ac65f2261624fda42700cb5c51ff38ab3bf9d91ef161c1676c18f"
+SOURCE_FILES = {
+    "index.html",
+    "main.tsx",
+    "App.tsx",
+    "tokens.css",
+    "layout.css",
+    "components/button.css",
+}
 OUTPUT_NAMES = {"index.html", "app.js", "app.css"}
 MAX_RESPONSE = 8 * 1024 * 1024
 
@@ -50,7 +57,12 @@ def trusted_tool(name: str) -> str:
 
 def verified_source_hashes(report: dict[str, Any]) -> dict[str, str]:
     coverage = report["coverage"]
-    entries = [*report["files"], *coverage["tsx_sources"], *coverage["trusted_sources"]]
+    entries = [
+        *report["files"],
+        *coverage["tsx_sources"],
+        *coverage["trusted_sources"],
+        *coverage["app_sources"],
+    ]
     hashes = {entry["path"]: entry["sha256"] for entry in entries}
     require(
         len(hashes) == len(entries) and set(hashes) == SOURCE_FILES,
@@ -90,10 +102,15 @@ def source_check(manifest: Path, node: str) -> dict[str, Any]:
         timeout=30,
         check=False,
     )
-    require(
-        run.returncode == 0 and run.stdout.strip(),
-        f"source gate failed: {run.stderr.strip()}",
-    )
+    if run.returncode != 0 or not run.stdout.strip():
+        try:
+            failed = json.loads(run.stdout)
+            detail = ", ".join(
+                f"{issue['path']}:{issue['code']}" for issue in failed["issues"]
+            )
+        except (ValueError, KeyError, TypeError):
+            detail = (run.stderr or run.stdout).strip()[:1000]
+        raise AssertionError(f"source gate failed: {detail}")
     try:
         return json.loads(run.stdout)
     except ValueError as error:
@@ -163,7 +180,8 @@ def validate_build(
             "builder_version",
             "react_version",
             "react_dom_version",
-            "bootstrap_sha256",
+            "entry_sha256",
+            "host_sha256",
             "metafile",
             "files",
         },
@@ -176,6 +194,14 @@ def validate_build(
     require(
         response["react_version"] == response["react_dom_version"] == "19.3.0",
         "wrong React version",
+    )
+    require(
+        response["entry_sha256"] == sha256((source / "main.tsx").read_bytes()),
+        "builder used the wrong app entry",
+    )
+    require(
+        response["host_sha256"] == sha256((source / "index.html").read_bytes()),
+        "builder used the wrong app host",
     )
     files: dict[str, bytes] = {}
     for item in response["files"]:
@@ -192,6 +218,10 @@ def validate_build(
         require(sha256(data) == item["sha256"], "build output hash mismatch")
         files[name] = data
     require(set(files) == OUTPUT_NAMES, "build output inventory is incomplete")
+    require(
+        files["index.html"] == (source / "index.html").read_bytes(),
+        "build output differs from the checked app host",
+    )
     html = files["index.html"].decode("utf-8")
     require(
         html.count('<link rel="stylesheet" href="./app.css">') == 1,
@@ -211,9 +241,6 @@ def validate_build(
     runtime_inputs: dict[str, str] = {}
     runtime_root = (builder / "node_modules").resolve(strict=True)
     for name in meta["inputs"]:
-        if name == "__adsf_entry.tsx":
-            source_inputs.add(name)
-            continue
         resolved = (source / name).resolve(strict=True)
         if resolved.is_relative_to(source):
             source_inputs.add(resolved.relative_to(source).as_posix())
@@ -225,7 +252,7 @@ def validate_build(
                 resolved.read_bytes()
             )
     require(
-        source_inputs == SOURCE_FILES | {"__adsf_entry.tsx"},
+        source_inputs == SOURCE_FILES - {"index.html"},
         "source build graph is not closed",
     )
     require(
@@ -239,6 +266,13 @@ def validate_build(
     require(len(meta["outputs"]) == 2, "unexpected emitted asset graph")
     emitted = {Path(name).name for name in meta["outputs"]}
     require(emitted == {"app.js", "app.css"}, "wrong emitted asset set")
+    js_output = next(
+        value for name, value in meta["outputs"].items() if name.endswith("app.js")
+    )
+    require(
+        js_output.get("entryPoint") == "main.tsx",
+        "built JavaScript did not use the checked app entry",
+    )
     css_inputs = next(
         value["inputs"]
         for name, value in meta["outputs"].items()
@@ -275,9 +309,30 @@ def verify_artifacts(output: Path, expected: dict[str, bytes]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--source",
+        type=Path,
+        default=SOURCE,
+        help="app source directory to inspect and build (default: checked-in fixture)",
+    )
+    parser.add_argument(
         "--output", type=Path, help="write verified app assets to a new directory"
     )
+    parser.add_argument(
+        "--attestation",
+        type=Path,
+        help="write a browser attestation to a new JSON file",
+    )
     args = parser.parse_args()
+    source = args.source.resolve(strict=True)
+    require(source.is_dir(), "source must be a directory")
+    require(
+        all(not path.is_symlink() for path in source.rglob("*")),
+        "source tree must not contain symlinks",
+    )
+    require(
+        args.attestation is None or args.output is not None,
+        "attestation requires --output",
+    )
     node = trusted_tool("ADSF_NODE_BIN")
     npm_cli = trusted_tool("ADSF_NPM_CLI")
     require(
@@ -290,7 +345,7 @@ def main() -> None:
         project.mkdir()
         shutil.copy2(MANIFEST, project / MANIFEST.name)
         shutil.copy2(SYSTEM, project / SYSTEM.name)
-        shutil.copytree(SOURCE, project / SOURCE.name)
+        shutil.copytree(source, project / SOURCE.name)
         before = {
             p.relative_to(project): p.read_bytes()
             for p in project.rglob("*")
@@ -305,7 +360,9 @@ def main() -> None:
         require(
             coverage["tsx_files"] == 1
             and coverage["css_files"] == 2
-            and coverage["html_files"] == 0,
+            and coverage["html_files"] == 0
+            and {(item["path"], item["role"]) for item in coverage["app_sources"]}
+            == {("index.html", "host"), ("main.tsx", "entry")},
             "wrong source coverage",
         )
         require(
@@ -391,11 +448,35 @@ def main() -> None:
             for name, data in artifacts.items():
                 (destination / name).write_bytes(data)
             verify_artifacts(destination, artifacts)
+        attestation = {
+            "format": "adsf-rendered-app-attestation-v1",
+            "contract_sha256": CONTRACT_SHA256,
+            "host_sha256": source_hashes["index.html"],
+            "entry_sha256": source_hashes["main.tsx"],
+            "source_sha256": dict(sorted(source_hashes.items())),
+            "artifact_sha256": {
+                name: sha256(data) for name, data in sorted(artifacts.items())
+            },
+            "builder_sha256": BUILDER_SHA256,
+            "browser_verifier_sha256": BROWSER_SHA256,
+        }
+        if args.attestation is not None:
+            attestation_path = args.attestation.absolute()
+            require(
+                not attestation_path.exists(), "attestation path must not already exist"
+            )
+            require(
+                not attestation_path.is_relative_to(destination),
+                "attestation must be outside output assets",
+            )
+            attestation_path.write_text(
+                json.dumps(attestation, indent=2, sort_keys=True) + "\n"
+            )
         print(
             json.dumps(
                 {
                     "status": "pass",
-                    "scope": "one static TSX component rendered by a trusted React bootstrap; browser result separate",
+                    "scope": "one static React app with exact pinned authored host/entry and policy-checked App/CSS; browser result separate",
                     "contract_sha256": CONTRACT_SHA256,
                     "builder_sha256": BUILDER_SHA256,
                     "lock_sha256": LOCK_SHA256,
@@ -414,6 +495,9 @@ def main() -> None:
                     ],
                     "output": str(args.output.absolute())
                     if args.output is not None
+                    else None,
+                    "attestation": str(args.attestation.absolute())
+                    if args.attestation is not None
                     else None,
                 },
                 indent=2,

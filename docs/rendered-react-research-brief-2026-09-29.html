@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>From design rules to rendered proof — ADSF research brief</title>
+  <title>Keeping coding assistants inside the design system — ADSF research brief</title>
   <style>
     :root { --ink:#17263a; --muted:#51627a; --blue:#2563eb; --soft:#edf4ff; --line:#d8e2ef; --red:#d62b45; }
     * { box-sizing:border-box; }
@@ -30,6 +30,8 @@
     .proof { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:17px 0; }
     .state { padding:18px; border-radius:13px; border:1px solid var(--line); background:#fbfdff; }
     .state em { display:block; font-size:12px; font-style:normal; color:var(--muted); font-weight:750; text-transform:uppercase; letter-spacing:.08em; }
+    .state strong { display:block; margin-top:9px; font:700 1.15rem/1.2 Georgia,serif; }
+    .kicker { margin:18px 0 4px; color:#164da3; font-size:12px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
     .sample { display:flex; align-items:center; gap:11px; margin-top:12px; font-size:13px; color:#354a66; }
     .swatch { width:30px; height:30px; border-radius:9px; box-shadow:0 2px 6px #152b4225; }
     .blue { background:var(--blue); } .red { background:var(--red); }
@@ -43,37 +45,44 @@
 <main>
   <header>
     <p class="eyebrow">Agent Design System / research brief / 29 September 2026</p>
-    <h1>From design rules to rendered proof</h1>
-    <p class="lede">A coding assistant can follow a design-system prompt and still ship the wrong color. The useful test is whether independent tools catch the source change, the built asset, and what the browser actually displays.</p>
-    <span class="pill">Research checkpoint · local validation passed · app-wide coverage remains open</span>
+    <h1>Keep the assistant inside the system</h1>
+    <p class="lede">Coding assistants can read a design system and still drift from it. Our research turns the system into a contract that independent tools can enforce, then follows one authored React page from source to browser pixels.</p>
+    <span class="pill">29 September checkpoint · local chain passed · independent assistant pilot next</span>
   </header>
   <div class="body">
     <div class="metrics" aria-label="Verified local results">
-      <div class="metric"><strong>109</strong><span>unit tests passed</span></div>
-      <div class="metric"><strong>9</strong><span>normative conformance cases passed</span></div>
+      <div class="metric"><strong>113</strong><span>unit tests passed locally</span></div>
+      <div class="metric"><strong>6</strong><span>app source files accounted for</span></div>
       <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
     </div>
     <section>
-      <h2>The enforcement path</h2>
-      <p class="callout">The core principle: give assistants an explicit contract, then verify their output independently. The runtime rule engine is deterministic, read-only when checking, and has no model or network dependency.</p>
-      <div class="flow" aria-label="Verification chain"><span>Approved tokens</span><b>→</b><span>Source gate</span><b>→</b><span>Locked build</span><b>→</b><span>Browser probe</span></div>
-      <p>The project gate inventories files under a declared root, checks token-sheet parity, rejects uninspected source, and binds static JSX class names to directly imported, inspected CSS. The new fixture carries those exact inspected bytes into a fixed React build and permits only the expected source, runtime modules, and three output files.</p>
+      <h2>The research finding</h2>
+      <p class="callout">A prompt is useful guidance; the enforceable boundary is a reviewed contract checked outside the assistant’s writable scope. The check itself is deterministic and has no runtime model or network dependency.</p>
+      <p>The open, vendor-neutral format records tokens and rule decisions as <code>report</code>, <code>coerce</code>, <code>reject</code>, or <code>ignore</code>. <code>adsys check</code> reports without changing source; <code>adsys fix</code> writes only to an explicit output unless asked to write in place. A separate, budgeted research loop can suggest improvements without sitting in the enforcement path.</p>
     </section>
     <section>
-      <h2>What the browser proved</h2>
-      <p>Chromium mounted one visible button, loaded the attested stylesheet, kept the approved token <code>#2563eb</code>, and computed the button background as <code>rgb(37, 99, 235)</code>. The browser requested only the expected HTML, JavaScript, and CSS.</p>
+      <h2>What we built and tested</h2>
+      <div class="flow" aria-label="Verification chain"><span>Reviewed contract</span><b>→</b><span>Source gate</span><b>→</b><span>Locked build</span><b>→</b><span>Attestation</span><b>→</b><span>Chromium</span></div>
+      <p>The project gate inventories every file under the app root, checks generated token parity, rejects unknown source, and links static JSX classes to inspected CSS. The React host <code>index.html</code> and mount entry <code>main.tsx</code> are app-authored, exact-pinned files. The external expected contract fingerprint is mandatory for this profile, so changing manifest pins alongside code cannot create a standalone pass.</p>
+      <p>The trusted builder consumes that entry, copies the checked host, and permits five bundled source inputs plus the separately checked HTML. Two independent source locations produced the same three output bytes. The verifier then issues a fresh artifact attestation outside the app output directory.</p>
+    </section>
+    <section>
+      <h2>Where the rule held</h2>
+      <p>Chromium mounted one visible button, loaded the attested stylesheet, kept the approved token <code>#2563eb</code>, and computed the button background as <code>rgb(37, 99, 235)</code>. It requested only the expected HTML, JavaScript, and CSS.</p>
       <div class="proof" aria-label="Browser mutation experiment">
-        <div class="state"><em>Approved response</em><div class="sample"><span class="swatch blue" aria-hidden="true"></span><span>Blue button · accepted</span></div></div>
-        <div class="state"><em>CSS response changed</em><div class="sample"><span class="swatch red" aria-hidden="true"></span><span>Red button · rejected by the same style assertion</span></div></div>
+        <div class="state"><em>Approved edit</em><strong>“Review now” · 16px padding</strong><div class="sample"><span class="swatch blue" aria-hidden="true"></span><span>Changed JS and CSS, verified in Chromium</span></div></div>
+        <div class="state"><em>Forbidden drift</em><strong>Literal red background</strong><div class="sample"><span class="swatch red" aria-hidden="true"></span><span>Source gate rejected the edit</span></div></div>
       </div>
-      <p>The red override changed only the served CSS response. Source files and on-disk build assets stayed unchanged. Separate negative checks caught a changed source byte, changed built CSS, and an extra emitted asset. Two builds from different local paths produced identical bytes.</p>
+      <p>The compliant edit used the approved <code>--space-4</code> token; Chromium observed its new text and 16px top padding. A forbidden <code>#ff0000</code> source edit failed the CSS rule before build. Separate negative checks rejected host and entry tampering, excluded pinned files, changed manifest pins, extra source, changed built CSS, and an extra emitted asset. A response-only red override also failed the normal browser color assertion.</p>
     </section>
     <section>
-      <h2>What remains open</h2>
-      <p>This is a rendered <strong>static component fixture</strong>. The HTML shell and React mount are trusted tool-owned code, so an ordinary app’s entrypoint, component graph, server, interactions, and full visual behavior are not yet covered. The new GitHub CI step is wired but has not been observed running remotely.</p>
-      <p>The next product test is a small protected pilot app: an assistant makes one approved design edit and one forbidden edit; CI must accept the first and reject the second while policy, verifier, and fingerprint remain independently controlled. That will measure the real problem: assistants staying inside the system as they edit application code.</p>
+      <h2>The honest boundary</h2>
+      <p>This is one <strong>fixed static React app profile</strong>, not arbitrary app coverage. The host and entry are reviewed byte-for-byte rather than semantically parsed. The browser asserts one button’s background; text and padding were observed in the controlled edit. Routes, interactions, dynamic component graphs, server behavior, and full visual fidelity still need coverage.</p>
+      <p>The browser command accepts an unsigned attestation, so its source provenance depends on the trusted Python verifier-to-browser handoff. CI is wired but has not been observed remotely at an exact commit. A blind assistant run is still unmeasured; today’s approved edit was a controlled local experiment.</p>
+      <p class="kicker">Next decisive experiment</p>
+      <p>Give a coding assistant write access only to App/CSS in an isolated pilot, while a protected base owns policy, fingerprint, build, and verifier. Ask for an approved edit and a tempting forbidden variation; run source, build, and browser checks on the actual route. That will test assistant adherence rather than just checker correctness.</p>
     </section>
-    <footer>Local evidence: 109 unit tests, nine conformance cases, Ruff, mypy, actionlint, source and build verifiers, and a Chromium probe. A temporary fixed output repaired the invalid example’s three errors; its accessibility warning remains. <a href="https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API">TypeScript parser reference</a> · <a href="https://playwright.dev/docs/ci">Browser automation reference</a>. No push or remote CI run is claimed.</footer>
+    <footer>Local evidence: 113 unit tests, nine conformance cases, Ruff, mypy, actionlint, source/build verification, and Chromium 154. The research budget had 3,000 daily tokens left at this checkpoint, below the configured 9,000-token reservation for another automated agent research run. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
   </div>
 </main>
 </body>
