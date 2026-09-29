@@ -97,9 +97,12 @@ on local Python 3.11. These are local results; no remote CI run is claimed.
    outside this bounded gate.
 2. Independent review and branch protection must pin the manifest, contract and
    CI workflow; an assistant able to edit all of them could update its own pin.
-3. Research reservations still need to be durably persisted before subprocess
-   execution, and malformed/untrusted event handling needs hardening. Current
-   failed attempts are accounted for, but no valid findings have been produced.
+3. The local runner now appends and syncs a reservation before invoking Codex;
+   a later settlement replaces it for budget calculations. A simulated
+   interruption leaves the reservation charged, and malformed usage retains
+   the minimum charge. The separate GitHub research workflow still needs a
+   pre-agent remote reservation and cancellation audit. Current failed attempts
+   are accounted for, but no valid findings have been produced.
 
 Jev was unavailable in this session (no exposed tool or API credential), so the
 panel used direct code evidence. The MacBook worker readiness snapshot reported

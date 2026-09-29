@@ -24,6 +24,7 @@ from .research import (
     make_plan,
     parse_time,
     record_run,
+    reserve_run,
     run_codex,
     status_report,
 )
@@ -448,14 +449,15 @@ def _research_record(args: argparse.Namespace) -> int:
     elif args.result_env:
         result_text = os.environ.get(args.result_env, "")
     usage = load_json(args.usage) if args.usage else None
-    entry = record_run(
-        plan,
-        result_text,
-        status=args.status,
-        ledger_path=args.ledger,
-        results_dir=args.results_dir,
-        usage=usage,
-    )
+    with ledger_lock(args.ledger):
+        entry = record_run(
+            plan,
+            result_text,
+            status=args.status,
+            ledger_path=args.ledger,
+            results_dir=args.results_dir,
+            usage=usage,
+        )
     print(json.dumps(entry, indent=2, sort_keys=True))
     return 0
 
@@ -477,6 +479,7 @@ def _research_run_locked(args: argparse.Namespace) -> int:
         print("\n--- PROMPT ---\n")
         print(build_prompt(plan))
         return 0
+    reserve_run(plan, args.ledger)
     result_text, usage, status = run_codex(
         plan,
         repository=args.repository,

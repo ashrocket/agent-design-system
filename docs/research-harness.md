@@ -8,20 +8,28 @@ An ADSF check remains deterministic, offline, and free to run.
 1. `adsys research plan` reads the append-only ledger, checks UTC daily,
    calendar-week, and calendar-month windows, enforces the per-day run count,
    observes question cooldowns, and reserves the next question's declared cost.
-2. A runner gives the generated read-only prompt and result schema to an agent.
+2. The local `research run` command durably appends the reserved charge before
+   starting Codex. A runner then gives the read-only prompt and schema to an agent.
 3. `adsys research record` validates identity and basic result structure, writes
-   an immutable result envelope, and appends a ledger entry.
+   a result envelope, and appends a settlement entry. Ledger loading uses the
+   latest entry for each run ID, so a reservation and settlement count once.
 4. Every attempt is charged the greater of reserved tokens or measured usage.
    Failed, empty, and malformed runs are still charged their reservation.
 
 Recording is idempotent by run ID. Retrying a publish job returns the existing
-ledger entry rather than charging the same agent attempt twice.
+settlement rather than charging the same agent attempt twice. If a local process
+is interrupted before settlement, its reservation remains charged and blocks a
+duplicate run. Malformed usage counters invalidate the result and retain the
+minimum reserved charge.
 
 The preflight reservation is the hard local gate. It prevents starting work that
 would exceed a configured rolling window, but it is not an OpenAI account spend
 limit. Since an individual agent run can exceed its estimate, set reservations
 conservatively and configure provider-side project spend controls as a second
-boundary when using API billing.
+boundary when using API billing. The separate GitHub plan/research/publish jobs
+still record after the model job; a canceled publish job can leave that remote
+attempt unrecorded. Treat the remote workflow as requiring operator audit until
+reservation is persisted on its state branch before the model job starts.
 
 ## Local runner
 

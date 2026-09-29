@@ -55,6 +55,7 @@ def load_ledger(path: str | Path) -> list[dict[str, Any]]:
     if not ledger_path.exists():
         return []
     entries: list[dict[str, Any]] = []
+    positions: dict[str, int] = {}
     for line_number, line in enumerate(
         ledger_path.read_text(encoding="utf-8").splitlines(), start=1
     ):
@@ -72,8 +73,55 @@ def load_ledger(path: str | Path) -> list[dict[str, Any]]:
             or "charged_tokens" not in entry
         ):
             raise FormatError(f"invalid ledger entry at {ledger_path}:{line_number}")
-        entries.append(entry)
+        run_id = entry.get("run_id")
+        if isinstance(run_id, str) and run_id in positions:
+            entries[positions[run_id]] = entry
+        else:
+            if isinstance(run_id, str):
+                positions[run_id] = len(entries)
+            entries.append(entry)
     return entries
+
+
+def reserve_run(plan: dict[str, Any], ledger_path: str | Path) -> dict[str, Any]:
+    """Persist the minimum charge before the local agent process starts."""
+    if plan.get("decision") != "run":
+        raise FormatError("cannot reserve a skipped research plan")
+    if any(entry.get("run_id") == plan["run_id"] for entry in load_ledger(ledger_path)):
+        raise FormatError("research run ID is already reserved or recorded")
+    reservation = int(plan["reserved_tokens"])
+    if reservation <= 0:
+        raise FormatError("research reservation must be positive")
+    entry = {
+        "run_id": plan["run_id"],
+        "question_id": plan["question_id"],
+        "started_at": plan["planned_at"],
+        "status": "reserved",
+        "reserved_tokens": reservation,
+        "actual_tokens": None,
+        "charged_tokens": reservation,
+        "result_path": None,
+    }
+    _append_ledger(ledger_path, entry, durable=True)
+    return entry
+
+
+def _append_ledger(
+    ledger_path: str | Path, entry: dict[str, Any], *, durable: bool = False
+) -> None:
+    ledger = Path(ledger_path)
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    with ledger.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+        if durable:
+            handle.flush()
+            os.fsync(handle.fileno())
+    if durable:
+        directory_handle = os.open(ledger.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_handle)
+        finally:
+            os.close(directory_handle)
 
 
 def budget_windows(config: dict[str, Any], now: datetime) -> list[BudgetWindow]:
@@ -195,10 +243,23 @@ def record_run(
         raise FormatError("cannot record a skipped research plan")
     for existing in load_ledger(ledger_path):
         if existing.get("run_id") == plan["run_id"]:
-            return existing
+            if existing.get("status") != "reserved":
+                return existing
+            if (
+                existing.get("question_id") != plan["question_id"]
+                or existing.get("started_at") != plan["planned_at"]
+                or existing.get("reserved_tokens") != int(plan["reserved_tokens"])
+            ):
+                raise FormatError("research settlement does not match reservation")
+            break
     finished_at = (now or datetime.now(UTC)).astimezone(UTC)
     reservation = int(plan["reserved_tokens"])
-    actual_tokens = _usage_total(usage)
+    usage_error: str | None = None
+    try:
+        actual_tokens = _usage_total(usage)
+    except FormatError as error:
+        actual_tokens = 0
+        usage_error = str(error)
     charged_tokens = max(reservation, actual_tokens)
     normalized_status = "succeeded" if status in {"success", "succeeded"} else "failed"
     result: dict[str, Any] | None = None
@@ -214,6 +275,10 @@ def record_run(
                 normalized_status = "invalid"
     else:
         result_error = "agent returned an empty result"
+        if normalized_status == "succeeded":
+            normalized_status = "invalid"
+    if usage_error:
+        result_error = f"{result_error}; {usage_error}" if result_error else usage_error
         if normalized_status == "succeeded":
             normalized_status = "invalid"
 
@@ -245,10 +310,7 @@ def record_run(
         "charged_tokens": charged_tokens,
         "result_path": str(result_path),
     }
-    ledger = Path(ledger_path)
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    with ledger.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+    _append_ledger(ledger_path, entry)
     return entry
 
 
@@ -314,8 +376,10 @@ def run_codex(
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if event.get("type") == "turn.completed" and isinstance(
-                event.get("usage"), dict
+            if (
+                isinstance(event, dict)
+                and event.get("type") == "turn.completed"
+                and isinstance(event.get("usage"), dict)
             ):
                 usage = event["usage"]
         result_text = (
@@ -375,10 +439,18 @@ def _skip_plan(
 
 
 def _usage_total(usage: dict[str, Any] | None) -> int:
-    if not usage:
+    if usage is None:
         return 0
+    if not isinstance(usage, dict):
+        raise FormatError("research usage must be an object")
     fields = ("input_tokens", "output_tokens", "reasoning_output_tokens")
-    return sum(int(usage.get(field, 0) or 0) for field in fields)
+    total = 0
+    for field in fields:
+        value = usage.get(field, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise FormatError(f"research usage {field} must be a nonnegative integer")
+        total += value
+    return total
 
 
 def _validate_research_result(result: Any, plan: dict[str, Any]) -> None:

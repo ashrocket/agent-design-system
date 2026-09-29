@@ -5,15 +5,18 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import jsonschema
 
+from agent_design_system.cli import main
 from agent_design_system.format import FormatError
 from agent_design_system.research import (
     ledger_lock,
     load_ledger,
     make_plan,
     record_run,
+    reserve_run,
     run_codex,
     status_report,
 )
@@ -138,6 +141,32 @@ class ResearchTests(unittest.TestCase):
             self.assertEqual(entry["status"], "invalid")
             self.assertEqual(entry["charged_tokens"], 9000)
 
+    def test_malformed_usage_settles_as_invalid_at_reservation(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        result = {
+            "run_id": plan["run_id"],
+            "question_id": plan["question_id"],
+            "summary": "One finding.",
+            "evidence": [],
+            "proposals": [],
+            "risks": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            reserve_run(plan, ledger)
+            entry = record_run(
+                plan,
+                json.dumps(result),
+                status="success",
+                ledger_path=ledger,
+                results_dir=Path(directory) / "results",
+                usage={"input_tokens": "unknown", "output_tokens": 3000},
+            )
+            self.assertEqual(entry["status"], "invalid")
+            self.assertEqual(entry["charged_tokens"], 9000)
+            envelope = json.loads(Path(entry["result_path"]).read_text())
+            self.assertIn("usage input_tokens", envelope["error"])
+
     def test_record_is_idempotent_by_run_id(self) -> None:
         plan = make_plan(self.budget, self.questions, [], now=self.now)
         result = {
@@ -166,6 +195,83 @@ class ResearchTests(unittest.TestCase):
             )
             self.assertEqual(first, second)
             self.assertEqual(len(load_ledger(ledger_path)), 1)
+
+    def test_reservation_survives_interruption_and_settles_once(self) -> None:
+        plan = make_plan(self.budget, self.questions, [], now=self.now)
+        with tempfile.TemporaryDirectory() as directory:
+            ledger_path = Path(directory) / "ledger.jsonl"
+            reserved = reserve_run(plan, ledger_path)
+            self.assertEqual(reserved["status"], "reserved")
+            self.assertEqual(
+                status_report(self.budget, load_ledger(ledger_path), self.now)["spend"][
+                    "daily"
+                ],
+                9000,
+            )
+            self.assertEqual(
+                make_plan(
+                    self.budget, self.questions, load_ledger(ledger_path), now=self.now
+                )["decision"],
+                "skip",
+            )
+            with self.assertRaisesRegex(FormatError, "already reserved"):
+                reserve_run(plan, ledger_path)
+            settled = record_run(
+                plan,
+                "",
+                status="failed",
+                ledger_path=ledger_path,
+                results_dir=Path(directory) / "results",
+                usage={"input_tokens": 8000, "output_tokens": 3000},
+                now=self.now + timedelta(minutes=1),
+            )
+            self.assertEqual(settled["charged_tokens"], 11000)
+            self.assertEqual(len(load_ledger(ledger_path)), 1)
+            self.assertEqual(load_ledger(ledger_path)[0]["status"], "failed")
+            self.assertEqual(len(ledger_path.read_text().splitlines()), 2)
+            self.assertEqual(
+                record_run(
+                    plan,
+                    "",
+                    status="failed",
+                    ledger_path=ledger_path,
+                    results_dir=Path(directory) / "results",
+                ),
+                settled,
+            )
+
+    def test_cli_reserves_before_agent_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            budget = root / "budget.json"
+            questions = root / "questions.json"
+            ledger = root / "ledger.jsonl"
+            budget.write_text(json.dumps(self.budget))
+            questions.write_text(json.dumps(self.questions))
+            arguments = [
+                "research",
+                "run",
+                "--budget",
+                str(budget),
+                "--questions",
+                str(questions),
+                "--ledger",
+                str(ledger),
+                "--results-dir",
+                str(root / "results"),
+                "--at",
+                self.now.isoformat(),
+            ]
+
+            def interrupted(*args: object, **kwargs: object) -> tuple[str, None, str]:
+                self.assertEqual(load_ledger(ledger)[0]["status"], "reserved")
+                raise RuntimeError("interrupted after process launch")
+
+            with patch("agent_design_system.cli.run_codex", side_effect=interrupted):
+                with self.assertRaisesRegex(RuntimeError, "interrupted"):
+                    main(arguments)
+            self.assertEqual(load_ledger(ledger)[0]["charged_tokens"], 9000)
+            self.assertEqual(len(ledger.read_text().splitlines()), 1)
 
     def test_failed_agent_output_remains_failed_not_invalid(self) -> None:
         plan = make_plan(self.budget, self.questions, [], now=self.now)
