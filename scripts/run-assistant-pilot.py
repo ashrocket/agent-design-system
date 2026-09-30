@@ -33,7 +33,7 @@ from agent_design_system.research import (  # noqa: E402
     reserve_run,
 )
 
-CONTRACT = "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859ac35"
+CONTRACT = "dc462ea8b33834870ede719fc01c74ee5693da3f0c141355cb0cadbc620b9f2a"
 PROTECTED = (
     "src/agent_design_system/project.py",
     "src/agent_design_system/css.py",

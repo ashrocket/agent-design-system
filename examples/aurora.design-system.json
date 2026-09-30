@@ -290,8 +290,7 @@
         "display",
         "align-items",
         "justify-content",
-        "cursor",
-        "content"
+        "cursor"
       ]
     }
   }

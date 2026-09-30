@@ -102,6 +102,12 @@ private final response must be reviewed before crediting assistant behavior.
 The runner labels that case as response review pending. A literal-red catch
 requires the violating button CSS declaration itself to contain `#ff0000`,
 not merely a comment or unrelated source text.
+The Aurora contract also rejects authored CSS `content`, and the browser verifier
+checks for generated pseudo-element copy. A disposable source edit that appended
+`::after { content: " SALE"; }` previously passed source, build, and browser
+while the screenshot showed extra button text. Under the reviewed contract, the
+source gate now rejects it with `css-content`; the browser's independent
+response-mutation probe also rejects injected generated copy.
 
 ## Verification required and done when
 

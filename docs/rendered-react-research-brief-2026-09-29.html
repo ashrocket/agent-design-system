@@ -51,7 +51,7 @@
   </header>
   <div class="body">
     <div class="metrics" aria-label="Verified local results">
-      <div class="metric"><strong>132</strong><span>unit tests passed locally</span></div>
+      <div class="metric"><strong>133</strong><span>unit tests passed locally</span></div>
       <div class="metric"><strong>6</strong><span>app source files accounted for</span></div>
       <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
     </div>
@@ -74,6 +74,7 @@
         <div class="state"><em>Forbidden drift</em><strong>Literal red background</strong><div class="sample"><span class="swatch red" aria-hidden="true"></span><span>Source gate rejected the edit</span></div></div>
       </div>
       <p>The compliant edit used the approved <code>--space-4</code> token; Chromium asserted its new text, 16px top and bottom padding, and unchanged foreground/background colors. The unchanged baseline failed that exact edit assertion. A forbidden <code>#ff0000</code> source edit failed the CSS rule before build. Separate negative checks rejected host and entry tampering, excluded pinned files, changed manifest pins, extra source, changed built CSS, and an extra emitted asset. A response-only red override also failed the normal browser color assertion.</p>
+      <p>A new adversarial check found a visible false pass: <code>::after { content: " SALE"; }</code> made the button read “Review SALE” in a screenshot while source, build, and browser checks passed. The Aurora contract now rejects that authored CSS as <code>css-content</code>. Chromium also checks generated pseudo-element copy and rejects the same text when injected into a CSS response. This closes that specific drift path in the fixed fixture.</p>
     </section>
     <section>
       <h2>The honest boundary</h2>
@@ -84,7 +85,13 @@
       <p>The pilot command now disables four known Codex feature surfaces: plugins, apps, browser use, and hooks. Its JSONL audit rejects incomplete streams and unknown tool items; a conclusive edited result must also show a command or file-change event. A local configured-server listing still showed enabled Pidgin and 1Password entries, and the plugin listing showed enabled plugins. Those listings cannot establish the effective tools inside <code>codex exec --ignore-user-config</code>; post-run events also cannot prove what was offered. The exact runtime tool and writable-root boundary remains unverified.</p>
       <p>The shared ledger has already used its one run for 30 September, so the runner returned <code>skip</code> without starting an assistant. A future controlled assistant run and a protected base-ref CI run are necessary before claiming this boundary holds in a normal assistant-edited PR.</p>
     </section>
-    <footer>30 September update: 132 unit tests, nine conformance cases, Ruff, mypy, source/build verification, and prior Chromium 154 checks passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; live recovery remains unverified. The assistant-edit runner is tested locally but has not launched a real assistant. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
+    <section>
+      <h2>Next steps</h2>
+      <p><strong>First, prove the pilot boundary.</strong> Inspect the effective tools and writable roots for the exact Codex run, or use a controlled runner with known tool access. Keep trusted policy and result paths outside the assistant’s writable area.</p>
+      <p><strong>Then run two blind edits on separate budgeted UTC days.</strong> Test the approved label-and-padding change, followed by the forbidden literal-red request. Preserve each prompt, event stream, and source patch privately; panel-review assistant behavior separately from the independent source, build, and browser outcomes.</p>
+      <p><strong>Finally, verify the normal PR path.</strong> With explicit push authorization, require protected base-ref CI at the assistant patch’s exact SHA. Extend beyond this fixed fixture using a reviewed Retailaer contract for assets, fonts, web color roles, geometry, and visual exceptions. The 30 September Retailaer case study is research input for that later milestone.</p>
+    </section>
+    <footer>30 September update: 133 unit tests, nine conformance cases, Ruff, mypy, source/build verification, and Chromium 154 checks passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; live recovery remains unverified. The assistant-edit runner is tested locally but has not launched a real assistant. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
   </div>
 </main>
 </body>

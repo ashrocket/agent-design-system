@@ -67,6 +67,10 @@ token shadowing and unapproved variable indirection. Priority overrides,
 unapproved functions, fallback values and unknown properties are rejected.
 Adding visual shorthands or properties to `unrestricted_properties` is an explicit
 coverage exemption; review exemptions for alternate ways to set governed styles.
+The Aurora fixture does not exempt `content`: generated `::before` or `::after`
+copy can change visible labels without changing DOM `textContent`. Another
+design system may explicitly allow it, but that system must review and verify
+the resulting visible copy.
 
 ## Repairs and evidence
 
@@ -276,6 +280,10 @@ the attested bytes from a local three-path server, blocks unknown and external
 requests, and checks that Chromium mounted one visible button, loaded the CSS,
 retained the approved token, and computed the approved button foreground and
 background.
+It also rejects generated `::before` and `::after` content on the rendered page.
+An injected CSS response that adds pseudo-element text must fail that assertion;
+this closes a local false pass where the screenshot showed extra button copy
+while DOM `textContent` and the previous color checks remained unchanged.
 For the controlled approved edit, append `--expect-approved-edit-v1` to require
 the exact “Review now” text and 16px top and bottom padding; the baseline must
 fail that mode. It then replaces the CSS *response* with a red override while

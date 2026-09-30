@@ -19,11 +19,11 @@ MANIFEST = ROOT / "examples/rendered-react.project.json"
 SYSTEM = ROOT / "examples/aurora.design-system.json"
 SOURCE = ROOT / "examples/rendered-react-source"
 BUILDER = ROOT / "scripts/react-fixture"
-CONTRACT_SHA256 = "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859ac35"
+CONTRACT_SHA256 = "dc462ea8b33834870ede719fc01c74ee5693da3f0c141355cb0cadbc620b9f2a"
 BUILDER_SHA256 = "7b1ba44ded6fb4eb87958da3df1245a44b68d6c1ddc455911fc3c0ca0c19e5ad"
 LOCK_SHA256 = "db2c3264f715b9358b6b2b5bd5d63c1f42ea3239fe36ddc3b892f7f39ce906e6"
 PACKAGE_SHA256 = "4ae3d06da8a18c2df3f5bf1b4bbff9bd7c3c02c85bc785301d75399446109e3c"
-BROWSER_SHA256 = "3b2844806d3914a1ded7467d9632e7a2cee693d129d3b389aa4d13bee0d563f5"
+BROWSER_SHA256 = "422b03507885a7072949576d83919f9f93470b1d87cf514a44fd98b1036551b3"
 SOURCE_FILES = {
     "index.html",
     "main.tsx",

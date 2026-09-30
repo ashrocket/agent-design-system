@@ -521,11 +521,25 @@ class PinnedReactEntryTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.fingerprint = (
-            "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859ac35"
+            "dc462ea8b33834870ede719fc01c74ee5693da3f0c141355cb0cadbc620b9f2a"
         )
 
     def report(self) -> dict:
         return check_project(self.manifest_path, expected_sha256=self.fingerprint)
+
+    def test_generated_button_copy_is_rejected_by_fixture_policy(self) -> None:
+        button = self.app / "components/button.css"
+        button.write_text(
+            button.read_text(encoding="utf-8")
+            + '\n.primary-button::after { content: " SALE"; }\n',
+            encoding="utf-8",
+        )
+        report = self.report()
+        self.assertEqual(report["status"], "fail")
+        self.assertIn(
+            ("components/button.css", "css-content"),
+            {(issue["path"], issue["code"]) for issue in report["issues"]},
+        )
 
     def test_authored_host_and_entry_are_covered_and_read_only(self) -> None:
         schema = load_json(

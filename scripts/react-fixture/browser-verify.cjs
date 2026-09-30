@@ -8,7 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
 
-const CONTRACT_SHA256 = "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859ac35";
+const CONTRACT_SHA256 = "dc462ea8b33834870ede719fc01c74ee5693da3f0c141355cb0cadbc620b9f2a";
 const HOST_SHA256 = "ee9a5bfac05c54185d82466c9caf34561d776660a34a102078558769e5100487";
 const ENTRY_SHA256 = "72da1443db0148098b5454fc2ff659c609f46508294e116f5e63401f93e900c1";
 const BUILDER_SHA256 = "7b1ba44ded6fb4eb87958da3df1245a44b68d6c1ddc455911fc3c0ca0c19e5ad";
@@ -16,6 +16,7 @@ const SOURCE_NAMES = ["index.html", "main.tsx", "App.tsx", "tokens.css", "layout
 const PATHS = { "/": "index.html", "/app.js": "app.js", "/app.css": "app.css" };
 const MEDIA = { "index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css" };
 const RED_OVERRIDE = "\n.primary-button{background-color:#ff0000!important}\n";
+const GENERATED_COPY_OVERRIDE = '\n.primary-button::after{content:" SALE"}\n';
 
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
@@ -60,7 +61,7 @@ function loadArtifacts(root, expected) {
   return files;
 }
 
-async function probe(browser, origin, files, inject) {
+async function probe(browser, origin, files, injectedCss) {
   const context = await browser.newContext({ serviceWorkers: "block" });
   const attempts = [];
   const responses = [];
@@ -70,11 +71,11 @@ async function probe(browser, origin, files, inject) {
     if (url.origin !== origin || !(url.pathname in PATHS)) {
       attempts.push(route.request().url());
       await route.abort();
-    } else if (inject && url.pathname === "/app.css") {
+    } else if (injectedCss && url.pathname === "/app.css") {
       await route.fulfill({
         status: 200,
         contentType: "text/css",
-        body: Buffer.concat([files["app.css"], Buffer.from(RED_OVERRIDE)]),
+        body: Buffer.concat([files["app.css"], Buffer.from(injectedCss)]),
       });
     } else {
       await route.continue();
@@ -88,6 +89,15 @@ async function probe(browser, origin, files, inject) {
   await page.locator("button.primary-button").waitFor({ state: "visible" });
   const observed = await page.evaluate(() => {
     const button = document.querySelector("button.primary-button");
+    const generatedContent = [];
+    for (const element of document.querySelectorAll("*")) {
+      for (const pseudo of ["::before", "::after"]) {
+        const content = getComputedStyle(element, pseudo).content;
+        if (content && content !== "none" && content !== "normal") {
+          generatedContent.push({ tag: element.tagName.toLowerCase(), pseudo, content });
+        }
+      }
+    }
     return {
       count: document.querySelectorAll("button.primary-button").length,
       visible: button.getBoundingClientRect().width > 0 && button.getBoundingClientRect().height > 0,
@@ -99,10 +109,11 @@ async function probe(browser, origin, files, inject) {
       token: getComputedStyle(document.documentElement).getPropertyValue("--color-action-primary").trim(),
       root_children: document.getElementById("root").children.length,
       stylesheet: document.querySelector("link[rel=stylesheet]")?.getAttribute("href"),
+      generated_content: generatedContent,
     };
   });
   let screenshot = null;
-  if (!inject) {
+  if (!injectedCss) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "adsf-rendered-browser-"));
     const screenshotPath = path.join(directory, "fixture.png");
     const png = await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -114,6 +125,10 @@ async function probe(browser, origin, files, inject) {
 
 function assertApprovedStyle(result) {
   requireCondition(result.observed.background === "rgb(37, 99, 235)", "approved button color did not render");
+}
+
+function assertNoGeneratedContent(result) {
+  requireCondition(result.observed.generated_content.length === 0, "generated CSS pseudo content detected");
 }
 
 async function main() {
@@ -145,9 +160,10 @@ async function main() {
   try {
     const executablePath = process.env.ADSF_CHROME_BIN || undefined;
     browser = await chromium.launch({ executablePath, headless: true });
-    const normal = await probe(browser, origin, files, false);
-    const mutated = await probe(browser, origin, files, true);
-    for (const result of [normal, mutated]) {
+    const normal = await probe(browser, origin, files, null);
+    const mutated = await probe(browser, origin, files, RED_OVERRIDE);
+    const generated = await probe(browser, origin, files, GENERATED_COPY_OVERRIDE);
+    for (const result of [normal, mutated, generated]) {
       requireCondition(result.attempts.length === 0, "browser attempted an external or unknown request");
       requireCondition(result.errors.length === 0, `browser errors: ${result.errors.join("; ")}`);
       requireCondition(result.observed.count === 1 && result.observed.visible && result.observed.root_children === 1, "mounted button missing or ambiguous");
@@ -155,6 +171,8 @@ async function main() {
       requireCondition(["/", "/app.js", "/app.css"].every((name) => result.responses.some((item) => item.path === name && item.status === 200)), "browser did not load all attested assets");
     }
     assertApprovedStyle(normal);
+    assertNoGeneratedContent(normal);
+    assertNoGeneratedContent(mutated);
     requireCondition(normal.observed.foreground === "rgb(248, 250, 252)", "approved button foreground did not render");
     if (process.argv[4] === "--expect-approved-edit-v1") {
       requireCondition(normal.observed.text === "Review now", "approved edit text did not render");
@@ -170,13 +188,26 @@ async function main() {
       rejectedMutation = true;
     }
     requireCondition(rejectedMutation, "mutated browser response unexpectedly passed the approved-style assertion");
+    requireCondition(
+      generated.observed.generated_content.some((item) => item.tag === "button" && item.pseudo === "::after"),
+      "generated-content mutation did not reach the browser probe"
+    );
+    let rejectedGeneratedCopy = false;
+    try {
+      assertNoGeneratedContent(generated);
+    } catch (error) {
+      requireCondition(error.message === "generated CSS pseudo content detected", "generated-content mutation failed for an unrelated reason");
+      rejectedGeneratedCopy = true;
+    }
+    requireCondition(rejectedGeneratedCopy, "generated-content mutation unexpectedly passed the visible-copy assertion");
     process.stdout.write(JSON.stringify({
       status: "pass",
-      scope: "one mounted static authored React app and its button background probe",
+      scope: "one mounted static authored React app with button color and generated-copy probes",
       browser_version: browser.version(),
       normal: normal.observed,
       injected_css: { background: mutated.observed.background, rejected_by_approved_style_assertion: true },
-      external_or_unknown_attempts: normal.attempts.length + mutated.attempts.length,
+      generated_content_mutation: { observed: true, rejected_by_generated_content_assertion: true },
+      external_or_unknown_attempts: normal.attempts.length + mutated.attempts.length + generated.attempts.length,
       served_paths: [...new Set(requests)].sort(),
       screenshot: normal.screenshot,
       artifact_sha256: expected,

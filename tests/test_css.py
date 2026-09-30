@@ -199,22 +199,26 @@ class CSSTests(unittest.TestCase):
         self.assertEqual(result.coverage["selector_classes"], ["alpha", "beta"])
 
     def test_comments_strings_and_newlines_survive_exact_fixes(self) -> None:
+        system = copy.deepcopy(self.system)
+        system["extensions"]["css"]["unrestricted_properties"].append("content")
         source = '/* untouched */\r\n.x { content: "a;{}:/*not-comment*/"; color: /* before */ #1E293B /* after */; padding: 12.0PX 16px; }\r\n'
-        result = enforce_css(self.system, source, apply_fixes=True)
+        result = enforce_css(system, source, apply_fixes=True)
         expected = source.replace("#1E293B", "var(--color-text-primary)").replace(
             "12.0PX 16px", "var(--space-3) var(--space-4)"
         )
         self.assertEqual(result.document, expected)
-        self.assertFalse(enforce_css(self.system, result.document).violations)
+        self.assertFalse(enforce_css(system, result.document).violations)
 
     def test_internal_comments_and_spacing_survive_multivalue_repair(self) -> None:
+        system = copy.deepcopy(self.system)
+        system["extensions"]["css"]["unrestricted_properties"].append("content")
         source = '.x { padding: 12px\t/* retain this */\n 16px; content: "Hello!"; }'
-        result = enforce_css(self.system, source, apply_fixes=True)
+        result = enforce_css(system, source, apply_fixes=True)
         expected = source.replace("12px", "var(--space-3)").replace(
             "16px", "var(--space-4)"
         )
         self.assertEqual(result.document, expected)
-        self.assertFalse(enforce_css(self.system, result.document).violations)
+        self.assertFalse(enforce_css(system, result.document).violations)
 
     def test_typed_token_units_are_validated(self) -> None:
         for token_type, value in (
