@@ -10,6 +10,9 @@ An ADSF check remains deterministic, offline, and free to run.
    observes question cooldowns, and reserves the next question's declared cost.
 2. The local `research run` command durably appends the reserved charge before
    starting Codex. A runner then gives the read-only prompt and schema to an agent.
+   Detached jobs can use `research reserve` with the same budget and question
+   files as `research plan`; reservation rechecks the question and current UTC
+   budget under one ledger lock and rejects stale plans before launch.
 3. `adsys research record` validates identity and basic result structure, writes
    a result envelope, and appends a settlement entry. Ledger loading uses the
    latest entry for each run ID, so a reservation and settlement count once.
@@ -42,11 +45,23 @@ Run once with an authenticated Codex CLI:
 adsys research run
 ```
 
-The runner uses `codex exec --ephemeral --sandbox read-only --json` with low
-reasoning effort and low response verbosity, requests a schema-constrained final
+The runner uses `codex exec` with `--ignore-user-config`, `--ephemeral`,
+`--sandbox read-only`, and `--json`. It sets low reasoning effort and low
+response verbosity, requests a schema-constrained final
 result, and parses the `turn.completed` usage event. The official Codex
 non-interactive documentation describes JSONL events and usage:
 <https://developers.openai.com/codex/non-interactive-mode>.
+Ignoring user configuration keeps unrelated MCP/plugin accounts out of this
+read-only research run; Codex authentication still uses the configured
+`CODEX_HOME`. A 30 September local run failed during a Pidgin OAuth refresh
+before producing a valid research result and was charged its 9,000-token
+reservation. The flag has unit coverage, but a successful subsequent live run
+is still required to verify the recovery.
+The flag does not disable managed or project-supplied plugin/rule sources;
+inspect the effective tool inventory before depending on it for a stronger
+isolation claim. Failed-agent diagnostics are reduced to safe reason codes,
+and tracked result envelopes keep only a digest and byte count of malformed
+raw output, not raw stderr that might contain credentials.
 
 Use cron, launchd, or another scheduler to call the command once nightly. The
 command exits successfully without invoking Codex when a budget or cooldown gate

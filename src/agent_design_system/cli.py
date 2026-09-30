@@ -25,6 +25,7 @@ from .research import (
     parse_time,
     record_run,
     reserve_run,
+    reserve_run_checked,
     run_codex,
     status_report,
 )
@@ -144,6 +145,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reserve.add_argument("--plan", required=True)
     reserve.add_argument("--ledger", default="research/ledger.jsonl")
+    reserve.add_argument("--budget", default="research/budget.json")
+    reserve.add_argument("--questions", default="research/questions.json")
     reserve.set_defaults(handler=_research_reserve)
 
     record = research_commands.add_parser(
@@ -449,8 +452,13 @@ def _research_status(args: argparse.Namespace) -> int:
 
 
 def _research_reserve(args: argparse.Namespace) -> int:
-    with ledger_lock(args.ledger):
-        entry = reserve_run(load_json(args.plan), args.ledger)
+    entry = reserve_run_checked(
+        load_json(args.plan),
+        args.ledger,
+        load_json(args.budget),
+        load_json(args.questions),
+        now=datetime.now(UTC),
+    )
     print(json.dumps(entry, indent=2, sort_keys=True))
     return 0
 

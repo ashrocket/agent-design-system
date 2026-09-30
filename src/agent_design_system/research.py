@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -101,6 +102,40 @@ def reserve_run(plan: dict[str, Any], ledger_path: str | Path) -> dict[str, Any]
     }
     _append_ledger(ledger_path, entry, durable=True)
     return entry
+
+
+def reserve_run_checked(
+    plan: dict[str, Any],
+    ledger_path: str | Path,
+    budget: dict[str, Any],
+    questions_document: dict[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Recheck the shared budget under one lock before a detached agent job."""
+    _validate_run_plan(plan)
+    planned_at = parse_time(plan["planned_at"])
+    age = now - planned_at
+    if (
+        planned_at.date() != now.date()
+        or age < -timedelta(minutes=1)
+        or age > timedelta(minutes=30)
+    ):
+        raise FormatError("research plan is stale or outside the current UTC day")
+    with ledger_lock(ledger_path):
+        current = make_plan(
+            budget, questions_document, load_ledger(ledger_path), now=now
+        )
+        if (
+            current["decision"] != "run"
+            or current["question_id"] != plan.get("question_id")
+            or current["question"] != plan.get("question")
+            or current["reserved_tokens"] != plan.get("reserved_tokens")
+        ):
+            raise FormatError(
+                f"research plan is stale or no longer within budget: {current.get('reason', 'question changed')}"
+            )
+        return reserve_run(plan, ledger_path)
 
 
 def _append_ledger(
@@ -287,8 +322,16 @@ def record_run(
     if result_text.strip():
         try:
             candidate = json.loads(result_text)
-            _validate_research_result(candidate, plan)
-            result = candidate
+            if (
+                normalized_status == "failed"
+                and isinstance(candidate, dict)
+                and isinstance(candidate.get("error"), str)
+                and candidate["error"].strip()
+            ):
+                result_error = _safe_failure_reason(candidate["error"])
+            else:
+                _validate_research_result(candidate, plan)
+                result = candidate
         except (json.JSONDecodeError, FormatError) as error:
             result_error = str(error)
             if normalized_status == "succeeded":
@@ -315,7 +358,10 @@ def record_run(
     if result_error:
         result_payload["error"] = result_error
         if result_text:
-            result_payload["raw_result"] = result_text[:32000]
+            result_payload["raw_result_sha256"] = hashlib.sha256(
+                result_text.encode("utf-8")
+            ).hexdigest()
+            result_payload["raw_result_bytes"] = len(result_text.encode("utf-8"))
     artifact_error: str | None = None
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -370,6 +416,7 @@ def run_codex(
         command = [
             codex_executable,
             "exec",
+            "--ignore-user-config",
             "--ephemeral",
             "--sandbox",
             "read-only",
@@ -395,8 +442,10 @@ def run_codex(
                 check=False,
                 timeout=timeout_seconds,
             )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            return json.dumps({"error": str(error)}), None, "failed"
+        except OSError:
+            return json.dumps({"error": "Codex executable unavailable"}), None, "failed"
+        except subprocess.TimeoutExpired:
+            return json.dumps({"error": "Codex attempt timed out"}), None, "failed"
         usage: dict[str, Any] | None = None
         for line in completed.stdout.splitlines():
             try:
@@ -414,8 +463,17 @@ def run_codex(
         )
         status = "success" if completed.returncode == 0 else "failed"
         if not result_text and completed.stderr:
-            result_text = json.dumps({"error": completed.stderr[-4000:]})
+            result_text = json.dumps({"error": _safe_failure_reason(completed.stderr)})
         return result_text, usage, status
+
+
+def _safe_failure_reason(message: str) -> str:
+    lowered = message.lower()
+    if "pidgin" in lowered and "invalid_grant" in lowered:
+        return "Pidgin OAuth refresh failed: invalid_grant"
+    if "oauth" in lowered:
+        return "MCP OAuth setup failed"
+    return "Codex agent attempt failed; raw diagnostic omitted"
 
 
 def _spend_by_window(
