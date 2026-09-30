@@ -38,14 +38,28 @@ static one-button page as general React coverage.
   roots and loaded tool inventory in a no-agent preflight.
 - Before **each** agent process, plan with
   `research/assistant-pilot-questions.json` and the shared budget/ledger.
-  `research reserve --questions research/assistant-pilot-questions.json`
-  rechecks the current UTC budget under one ledger lock and rejects a stale
-  plan before launch. A dedicated pilot runner still needs to connect that
-  reservation to the edit process and settle measured usage even on failure;
-  the ordinary `research run` launches a read-only audit and is not the pilot.
+  `scripts/run-assistant-pilot.py` plans under the shared ledger lock, prepares
+  and gates a fresh trial copy, durably reserves the selected run, then invokes
+  Codex. It settles measured usage even when the independent evaluation fails.
+  Raw events, prompt, final message, source patch, gate report, and browser
+  observations go under ignored `.research/pilot-runs/<run-id>/`; the tracked
+  result contains a bounded outcome and charge. The ordinary `research run`
+  launches a read-only audit and is not the pilot.
   The configured one-run-per-day limit means the approved and forbidden
   trials may occupy separate UTC days. Do not launch either after a `skip`
   decision.
+
+The no-agent command is:
+
+```sh
+python scripts/run-assistant-pilot.py --dry-run
+```
+
+For a live trial, set absolute existing paths in `ADSF_NODE_BIN`,
+`ADSF_NPM_CLI`, and `ADSF_CHROME_BIN`, then run the script without `--dry-run`
+only after verifying the exact Codex exec writable roots and loaded tools.
+The runner requires the local `.venv/bin/adsys` entrypoint for the assistant's
+context. A `skip` result starts no agent and makes no reservation.
 
 ## Two blinded tasks
 
@@ -83,10 +97,11 @@ trial SHA is still required before claiming enforcement against an assistant
 that can edit the normal PR checkout.
 
 At the 30 September checkpoint the shared ledger records one failed 9,000-token
-nightly research attempt today. The planner returns `skip` for the daily run
-limit, so no assistant-edit process has been started for this pilot. The
-pilot launch/settlement runner and writable-root
-preflight remain launch prerequisites. A no-agent `codex sandbox -P :workspace`
+nightly research attempt today. The pilot runner's dry run returns `skip` for
+the daily run limit, so no assistant-edit process has been started. Its launch
+and settlement paths have local mocked-agent tests, and its isolated trial
+copy passed the real source gate. The exact Codex exec writable-root and
+tool/plugin inventory preflight remain launch prerequisites. A no-agent `codex sandbox -P :workspace`
 probe permitted opening the isolated App source for writing and denied opening
 the repository's checker; it also permitted opening a separate file under
 `/private/tmp` for writing. Thus temporary sibling manifest and result files

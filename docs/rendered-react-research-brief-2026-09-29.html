@@ -44,14 +44,14 @@
 <body>
 <main>
   <header>
-    <p class="eyebrow">Agent Design System / research brief / 29 September 2026</p>
+    <p class="eyebrow">Agent Design System / research brief / 30 September 2026</p>
     <h1>Keep the assistant inside the system</h1>
     <p class="lede">Coding assistants can read a design system and still drift from it. Our research turns the system into a contract that independent tools can enforce, then follows one authored React page from source to browser pixels.</p>
-    <span class="pill">29 September checkpoint · local chain passed · independent assistant pilot next</span>
+    <span class="pill">30 September checkpoint · local chain passed · assistant trial budget-gated</span>
   </header>
   <div class="body">
     <div class="metrics" aria-label="Verified local results">
-      <div class="metric"><strong>117</strong><span>unit tests passed locally</span></div>
+      <div class="metric"><strong>121</strong><span>unit tests passed locally</span></div>
       <div class="metric"><strong>6</strong><span>app source files accounted for</span></div>
       <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
     </div>
@@ -80,9 +80,10 @@
       <p>This is one <strong>fixed static React app profile</strong>, not arbitrary app coverage. The host and entry are reviewed byte-for-byte rather than semantically parsed. The browser asserts the button’s foreground and background, plus exact text and vertical padding in the controlled edit mode. Routes, interactions, dynamic component graphs, server behavior, and full visual fidelity still need coverage.</p>
       <p>The browser command accepts an unsigned attestation, so its source provenance depends on the trusted Python verifier-to-browser handoff. CI is wired but has not been observed remotely at an exact commit. A blind assistant run is still unmeasured; the approved edit was a controlled local experiment.</p>
       <p class="kicker">Next decisive experiment</p>
-      <p>Ask a coding assistant to edit App/CSS in an isolated pilot, while a protected base owns policy, fingerprint, build, and verifier. Check the complete patch for changes outside those files. A no-agent preflight already showed that the staged manifest checks the trial copy: literal red CSS there failed the rule while the original fixture stayed untouched. The actual assistant run, transcript, and protected CI proof remain ahead.</p>
+      <p>The new pilot runner prepares a disposable Git-backed copy, gives the assistant context that points to that copy, reserves the shared budget before launching Codex, and evaluates the source patch, build, and browser after the process exits. Its local tests prove the reservation precedes the mocked agent, an evaluator failure still settles measured usage, and a rejected red edit is labeled as caught drift. The real staged copy passed the source gate.</p>
+      <p>The shared ledger has already used its one run for 30 September, so the runner returned <code>skip</code> without starting an assistant. We still need to prove the exact Codex exec writable roots and loaded tools before spending a future run. A protected base-ref CI run remains necessary before claiming this boundary holds in a normal assistant-edited PR.</p>
     </section>
-    <footer>30 September update: 117 unit tests, nine conformance cases, Ruff, mypy, actionlint, source/build verification, and Chromium 154 passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; the runner now isolates user config, omits raw failed diagnostics from tracked results, and rechecks detached reservations under a ledger lock. Live recovery is unverified. The one-run daily budget gate prevented a blind assistant pilot today. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
+    <footer>30 September update: 121 unit tests, nine conformance cases, Ruff, mypy, source/build verification, and prior Chromium 154 checks passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; live recovery remains unverified. The assistant-edit runner is tested locally but has not launched a real assistant. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
   </div>
 </main>
 </body>
