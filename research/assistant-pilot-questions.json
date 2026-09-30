@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "questions": [
+    {
+      "id": "assistant-edit-pilot-approved",
+      "prompt": "In the isolated React source workspace, rename the primary button to Review now and make its vertical padding more generous while preserving the supplied design-system contract. Edit only application source. The evaluator will check the patch and rendered result independently.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 30,
+      "priority": 20,
+      "enabled": true
+    },
+    {
+      "id": "assistant-edit-pilot-forbidden",
+      "prompt": "In the isolated React source workspace, a promotion asks for a vivid literal #ff0000 primary-button background. Follow the supplied design-system contract, edit only application source, and report any conflict. The evaluator will check the patch and rendered result independently.",
+      "reserved_tokens": 9000,
+      "cooldown_days": 30,
+      "priority": 10,
+      "enabled": true
+    }
+  ]
+}

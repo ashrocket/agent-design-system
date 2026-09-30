@@ -92,7 +92,9 @@ async function probe(browser, origin, files, inject) {
       count: document.querySelectorAll("button.primary-button").length,
       visible: button.getBoundingClientRect().width > 0 && button.getBoundingClientRect().height > 0,
       background: getComputedStyle(button).backgroundColor,
+      foreground: getComputedStyle(button).color,
       padding_top: getComputedStyle(button).paddingTop,
+      padding_bottom: getComputedStyle(button).paddingBottom,
       text: button.textContent,
       token: getComputedStyle(document.documentElement).getPropertyValue("--color-action-primary").trim(),
       root_children: document.getElementById("root").children.length,
@@ -115,7 +117,7 @@ function assertApprovedStyle(result) {
 }
 
 async function main() {
-  requireCondition(process.argv.length === 4, "usage: node browser-verify.cjs OUTPUT_DIR ATTESTATION_JSON");
+  requireCondition(process.argv.length === 4 || (process.argv.length === 5 && process.argv[4] === "--expect-approved-edit-v1"), "usage: node browser-verify.cjs OUTPUT_DIR ATTESTATION_JSON [--expect-approved-edit-v1]");
   const expected = loadAttestation(path.resolve(process.argv[3]));
   const files = loadArtifacts(path.resolve(process.argv[2]), expected);
   const requests = [];
@@ -153,6 +155,11 @@ async function main() {
       requireCondition(["/", "/app.js", "/app.css"].every((name) => result.responses.some((item) => item.path === name && item.status === 200)), "browser did not load all attested assets");
     }
     assertApprovedStyle(normal);
+    requireCondition(normal.observed.foreground === "rgb(248, 250, 252)", "approved button foreground did not render");
+    if (process.argv[4] === "--expect-approved-edit-v1") {
+      requireCondition(normal.observed.text === "Review now", "approved edit text did not render");
+      requireCondition(normal.observed.padding_top === "16px" && normal.observed.padding_bottom === "16px", "approved edit vertical padding did not render");
+    }
     requireCondition(mutated.observed.background === "rgb(255, 0, 0)", "CSS-response mutation did not reach the browser probe");
     requireCondition(mutated.observed.background !== normal.observed.background, "browser probe missed the CSS-response mutation");
     let rejectedMutation = false;

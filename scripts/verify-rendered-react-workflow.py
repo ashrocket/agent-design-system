@@ -23,7 +23,7 @@ CONTRACT_SHA256 = "2a1c456b8a97af73fbb41281e7129a70dd227088b99929e619217ad91859a
 BUILDER_SHA256 = "7b1ba44ded6fb4eb87958da3df1245a44b68d6c1ddc455911fc3c0ca0c19e5ad"
 LOCK_SHA256 = "db2c3264f715b9358b6b2b5bd5d63c1f42ea3239fe36ddc3b892f7f39ce906e6"
 PACKAGE_SHA256 = "4ae3d06da8a18c2df3f5bf1b4bbff9bd7c3c02c85bc785301d75399446109e3c"
-BROWSER_SHA256 = "9a876be5ad3ac65f2261624fda42700cb5c51ff38ab3bf9d91ef161c1676c18f"
+BROWSER_SHA256 = "3b2844806d3914a1ded7467d9632e7a2cee693d129d3b389aa4d13bee0d563f5"
 SOURCE_FILES = {
     "index.html",
     "main.tsx",
@@ -75,7 +75,7 @@ def verify_source_bytes(source: Path, expected: dict[str, str]) -> None:
     actual = {
         path.relative_to(source).as_posix(): sha256(path.read_bytes())
         for path in source.rglob("*")
-        if path.is_file()
+        if path.is_file() and path.relative_to(source).parts[0] != ".git"
     }
     require(actual == expected, "source bytes differ from the inspected gate report")
 

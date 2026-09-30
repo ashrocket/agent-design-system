@@ -51,7 +51,7 @@
   </header>
   <div class="body">
     <div class="metrics" aria-label="Verified local results">
-      <div class="metric"><strong>113</strong><span>unit tests passed locally</span></div>
+      <div class="metric"><strong>117</strong><span>unit tests passed locally</span></div>
       <div class="metric"><strong>6</strong><span>app source files accounted for</span></div>
       <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
     </div>
@@ -73,16 +73,16 @@
         <div class="state"><em>Approved edit</em><strong>“Review now” · 16px padding</strong><div class="sample"><span class="swatch blue" aria-hidden="true"></span><span>Changed JS and CSS, verified in Chromium</span></div></div>
         <div class="state"><em>Forbidden drift</em><strong>Literal red background</strong><div class="sample"><span class="swatch red" aria-hidden="true"></span><span>Source gate rejected the edit</span></div></div>
       </div>
-      <p>The compliant edit used the approved <code>--space-4</code> token; Chromium observed its new text and 16px top padding. A forbidden <code>#ff0000</code> source edit failed the CSS rule before build. Separate negative checks rejected host and entry tampering, excluded pinned files, changed manifest pins, extra source, changed built CSS, and an extra emitted asset. A response-only red override also failed the normal browser color assertion.</p>
+      <p>The compliant edit used the approved <code>--space-4</code> token; Chromium asserted its new text, 16px top and bottom padding, and unchanged foreground/background colors. The unchanged baseline failed that exact edit assertion. A forbidden <code>#ff0000</code> source edit failed the CSS rule before build. Separate negative checks rejected host and entry tampering, excluded pinned files, changed manifest pins, extra source, changed built CSS, and an extra emitted asset. A response-only red override also failed the normal browser color assertion.</p>
     </section>
     <section>
       <h2>The honest boundary</h2>
-      <p>This is one <strong>fixed static React app profile</strong>, not arbitrary app coverage. The host and entry are reviewed byte-for-byte rather than semantically parsed. The browser asserts one button’s background; text and padding were observed in the controlled edit. Routes, interactions, dynamic component graphs, server behavior, and full visual fidelity still need coverage.</p>
-      <p>The browser command accepts an unsigned attestation, so its source provenance depends on the trusted Python verifier-to-browser handoff. CI is wired but has not been observed remotely at an exact commit. A blind assistant run is still unmeasured; today’s approved edit was a controlled local experiment.</p>
+      <p>This is one <strong>fixed static React app profile</strong>, not arbitrary app coverage. The host and entry are reviewed byte-for-byte rather than semantically parsed. The browser asserts the button’s foreground and background, plus exact text and vertical padding in the controlled edit mode. Routes, interactions, dynamic component graphs, server behavior, and full visual fidelity still need coverage.</p>
+      <p>The browser command accepts an unsigned attestation, so its source provenance depends on the trusted Python verifier-to-browser handoff. CI is wired but has not been observed remotely at an exact commit. A blind assistant run is still unmeasured; the approved edit was a controlled local experiment.</p>
       <p class="kicker">Next decisive experiment</p>
-      <p>Give a coding assistant write access only to App/CSS in an isolated pilot, while a protected base owns policy, fingerprint, build, and verifier. Ask for an approved edit and a tempting forbidden variation; run source, build, and browser checks on the actual route. That will test assistant adherence rather than just checker correctness.</p>
+      <p>Ask a coding assistant to edit App/CSS in an isolated pilot, while a protected base owns policy, fingerprint, build, and verifier. Check the complete patch for changes outside those files. A no-agent preflight already showed that the staged manifest checks the trial copy: literal red CSS there failed the rule while the original fixture stayed untouched. The actual assistant run, transcript, and protected CI proof remain ahead.</p>
     </section>
-    <footer>Local evidence: 113 unit tests, nine conformance cases, Ruff, mypy, actionlint, source/build verification, and Chromium 154. The research budget had 3,000 daily tokens left at this checkpoint, below the configured 9,000-token reservation for another automated agent research run. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
+    <footer>30 September update: 117 unit tests, nine conformance cases, Ruff, mypy, actionlint, source/build verification, and Chromium 154 passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; the runner now isolates user config, omits raw failed diagnostics from tracked results, and rechecks detached reservations under a ledger lock. Live recovery is unverified. The one-run daily budget gate prevented a blind assistant pilot today. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
   </div>
 </main>
 </body>

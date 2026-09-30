@@ -273,11 +273,14 @@ assistant's writable scope. The app profile requires an external expected
 contract fingerprint, so a caller cannot pass by changing manifest pins in
 the same checkout. The browser verifier checks that attestation, serves only
 the attested bytes from a local three-path server, blocks unknown and external
-requests, and
-checks that Chromium mounted one visible button, loaded the CSS, retained the
-approved token, and computed the approved button background. It then replaces
-the CSS *response* with a red override while leaving source and built files
-unchanged; the same approved-style assertion must reject that response. This
+requests, and checks that Chromium mounted one visible button, loaded the CSS,
+retained the approved token, and computed the approved button foreground and
+background.
+For the controlled approved edit, append `--expect-approved-edit-v1` to require
+the exact “Review now” text and 16px top and bottom padding; the baseline must
+fail that mode. It then replaces the CSS *response* with a red override while
+leaving source and built files unchanged; the same approved-style assertion
+must reject that response. This
 is a probe-sensitivity test, not a claim that every visual property was checked.
 The separate `serve.py` script is a manual preview helper and does not attest
 asset hashes. A standalone browser pass depends on the trusted Python verifier
