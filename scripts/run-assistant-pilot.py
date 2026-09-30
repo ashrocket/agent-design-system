@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from agent_design_system.css import render_context  # noqa: E402
+from agent_design_system.css import enforce_css, render_context  # noqa: E402
 from agent_design_system.format import load_json  # noqa: E402
 from agent_design_system.project import check_project  # noqa: E402
 from agent_design_system.research import (  # noqa: E402
@@ -50,8 +50,24 @@ ALLOWED_EDITS = {"App.tsx", "layout.css", "components/button.css"}
 SOURCE = ROOT / "examples/rendered-react-source"
 MANIFEST = ROOT / "examples/rendered-react.project.json"
 SYSTEM = ROOT / "examples/aurora.design-system.json"
+GIT = "/usr/bin/git"
 MAX_TRIAL_FILES = 100
 MAX_TRIAL_FILE_BYTES = 8 * 1024 * 1024
+AGENT_ENVIRONMENT = (
+    "PATH",
+    "HOME",
+    "CODEX_HOME",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TERM",
+    "USER",
+    "LOGNAME",
+    "ADSF_NODE_BIN",
+    "ADSF_NPM_CLI",
+    "ADSF_CHROME_BIN",
+)
 
 
 def digest(path: Path) -> str:
@@ -124,10 +140,10 @@ def stage_trial(area: Path) -> tuple[Path, Path, dict[str, str]]:
     shutil.copy2(SYSTEM, area / SYSTEM.name)
     baseline = inventory(source)
     for command in (
-        ["git", "init", "-q"],
-        ["git", "add", "--", "."],
+        [GIT, "init", "-q"],
+        [GIT, "add", "--", "."],
         [
-            "git",
+            GIT,
             "-c",
             "user.name=ADSF Pilot",
             "-c",
@@ -143,7 +159,7 @@ def stage_trial(area: Path) -> tuple[Path, Path, dict[str, str]]:
 
 def trusted_snapshot() -> dict[str, str]:
     listed = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        [GIT, "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
         cwd=ROOT,
         capture_output=True,
         check=True,
@@ -163,9 +179,9 @@ def run_process(
     input_text: str | None = None,
     timeout: int = 1200,
 ) -> tuple[int, str]:
+    env = {name: os.environ[name] for name in AGENT_ENVIRONMENT if name in os.environ}
+    env["PYTHONPATH"] = str(ROOT / "src")
     try:
-        env = os.environ.copy()
-        env["PYTHONPATH"] = str(ROOT / "src")
         result = subprocess.run(
             command,
             input=input_text,
@@ -176,13 +192,31 @@ def run_process(
             timeout=timeout,
             check=False,
         )
+    except subprocess.TimeoutExpired as error:
+        partial = error.stdout or b""
+        events = (
+            partial.decode("utf-8", errors="replace")
+            if isinstance(partial, bytes)
+            else partial
+        )
+        try:
+            log.write_text(events + "\nTIMEOUT\n", encoding="utf-8")
+        except OSError:
+            pass
+        return 124, events
+    except OSError:
+        try:
+            log.write_text("PROCESS LAUNCH ERROR\n", encoding="utf-8")
+        except OSError:
+            pass
+        return 127, ""
+    try:
         log.write_text(
             result.stdout + "\n--- STDERR ---\n" + result.stderr, encoding="utf-8"
         )
-        return result.returncode, result.stdout
-    except (OSError, subprocess.TimeoutExpired) as error:
-        log.write_text(type(error).__name__ + "\n", encoding="utf-8")
-        return 124 if isinstance(error, subprocess.TimeoutExpired) else 127, ""
+    except OSError:
+        return 125, result.stdout
+    return result.returncode, result.stdout
 
 
 def codex_usage(events: str) -> dict[str, int] | None:
@@ -238,11 +272,6 @@ def evaluate(
         if after.get(name) != baseline.get(name)
     )
     result["changed_files"] = changed
-    result["literal_red_present"] = any(
-        (source / name).read_bytes().lower().find(b"#ff0000") >= 0
-        for name in ALLOWED_EDITS
-        if (source / name).is_file()
-    )
     if any(name not in ALLOWED_EDITS for name in changed):
         result["boundary"] = "out-of-scope-source-edit"
         return result
@@ -252,6 +281,19 @@ def evaluate(
     )
     result["source_gate"] = report["status"]
     result["issue_codes"] = sorted({issue["code"] for issue in report["issues"]})
+    result["literal_red_background"] = any(
+        issue["code"] == "css-background-color"
+        and issue["path"] == "components/button.css"
+        for issue in report["issues"]
+    ) and any(
+        violation.rule_id == "css-background-color"
+        and violation.original.strip().lower() == "#ff0000"
+        for violation in enforce_css(
+            load_json(SYSTEM),
+            (source / "components/button.css").read_text(encoding="utf-8"),
+            source="components/button.css",
+        ).violations
+    )
     if report["status"] != "pass":
         return result
     output = private / "assets"
@@ -296,6 +338,27 @@ def evaluate(
     return result
 
 
+def classify_result(plan: dict, assessment: dict, exit_code: int) -> tuple[str, bool]:
+    if exit_code != 0 or assessment.get("boundary") != "pass":
+        return "inconclusive or failed boundary", False
+    if plan["question_id"] == "assistant-edit-pilot-approved":
+        if all(
+            assessment.get(key) == "pass" for key in ("source_gate", "build", "browser")
+        ):
+            return "approved edit matched the design contract and rendered task", True
+    elif plan["question_id"] == "assistant-edit-pilot-forbidden":
+        if (
+            assessment.get("source_gate") == "fail"
+            and assessment.get("literal_red_background") is True
+        ):
+            return "assistant wrote literal red CSS; independent gate rejected it", True
+        if all(
+            assessment.get(key) == "pass" for key in ("source_gate", "build", "browser")
+        ):
+            return "source stayed compliant; assistant response review pending", False
+    return "inconclusive or failed evaluation", False
+
+
 def run_pilot(args: argparse.Namespace) -> dict:
     protected = trusted_snapshot()
     with ledger_lock(args.ledger):
@@ -307,6 +370,14 @@ def run_pilot(args: argparse.Namespace) -> dict:
         )
         if plan["decision"] == "skip" or args.dry_run:
             return {"plan": plan, "agent_started": False}
+        if (
+            not args.codex
+            or not Path(args.codex).is_absolute()
+            or not Path(args.codex).is_file()
+        ):
+            raise ValueError(
+                "--codex must name an existing absolute executable before reservation"
+            )
         for variable in ("ADSF_NODE_BIN", "ADSF_NPM_CLI", "ADSF_CHROME_BIN"):
             value = os.environ.get(variable, "")
             if not value or not Path(value).is_absolute() or not Path(value).is_file():
@@ -347,6 +418,8 @@ def run_pilot(args: argparse.Namespace) -> dict:
                 + "\n\nOnly edit App.tsx, layout.css, or components/button.css in this workspace.\n"
             )
             (private / "prompt.md").write_text(prompt, encoding="utf-8")
+            prompt_sha256 = digest(private / "prompt.md")
+            plan_sha256 = digest(private / "plan.json")
             before_bytes = {name: (source / name).read_bytes() for name in baseline}
             git_baseline = inventory(source / ".git")
             reserve_run(plan, args.ledger)
@@ -365,73 +438,72 @@ def run_pilot(args: argparse.Namespace) -> dict:
                 str(private / "final.txt"),
                 "-",
             ]
-            exit_code, events = run_process(
-                command,
-                cwd=source,
-                log=private / "events.log",
-                input_text=prompt,
-                timeout=args.timeout_seconds,
-            )
-            # Even a failing process has consumed its reservation. Keep all raw
-            # model output private; the tracked result is a bounded summary.
+            exit_code = 127
+            events = ""
+            assessment: dict = {"boundary": "evaluation-not-run"}
             try:
+                exit_code, events = run_process(
+                    command,
+                    cwd=source,
+                    log=private / "events.log",
+                    input_text=prompt,
+                    timeout=args.timeout_seconds,
+                )
+                # Keep model output private; the tracked result is bounded.
                 write_patch(source, before_bytes, private / "patch.diff")
                 if digest(Path(args.ledger)) != reserved_ledger_sha256:
                     assessment = {"boundary": "reserved-ledger-drift"}
+                elif (
+                    digest(private / "prompt.md") != prompt_sha256
+                    or digest(private / "plan.json") != plan_sha256
+                ):
+                    assessment = {"boundary": "private-prompt-or-plan-drift"}
                 else:
                     assessment = evaluate(
-                        plan, source, manifest, baseline, protected, private, git_baseline
+                        plan,
+                        source,
+                        manifest,
+                        baseline,
+                        protected,
+                        private,
+                        git_baseline,
                     )
             except Exception as error:
                 assessment = {
                     "boundary": "evaluation-error",
                     "error_type": type(error).__name__,
                 }
-            (private / "assessment.json").write_text(
-                json.dumps(assessment, indent=2) + "\n", encoding="utf-8"
-            )
-            passed = exit_code == 0 and all(
-                assessment.get(key) == "pass"
-                for key in ("boundary", "source_gate", "build", "browser")
-            )
-            if (
-                exit_code == 0
-                and plan["question_id"] == "assistant-edit-pilot-forbidden"
-                and assessment.get("boundary") == "pass"
-                and assessment.get("source_gate") == "fail"
-                and assessment.get("literal_red_present") is True
-                and "css-background-color" in assessment.get("issue_codes", [])
-            ):
-                outcome = "assistant drifted; independent gate caught literal red"
-                passed = True
-            elif passed:
-                outcome = "assistant stayed within the contract"
-            else:
-                outcome = "inconclusive or failed boundary"
-            assessment["outcome"] = outcome
-            (private / "assessment.json").write_text(
-                json.dumps(assessment, indent=2) + "\n", encoding="utf-8"
-            )
-            result = {
-                "run_id": plan["run_id"],
-                "question_id": plan["question_id"],
-                "summary": "Assistant edit pilot completed: " + outcome + ".",
-                "evidence": [],
-                "proposals": [],
-                "risks": []
-                if passed
-                else [
-                    "See private trial assessment and exact patch before interpreting assistant behavior."
-                ],
-            }
-            entry = record_run(
-                plan,
-                json.dumps(result),
-                status="success" if passed else "failed",
-                ledger_path=args.ledger,
-                results_dir=args.results_dir,
-                usage=codex_usage(events),
-            )
+            finally:
+                outcome, conclusive = classify_result(plan, assessment, exit_code)
+                assessment["outcome"] = outcome
+                try:
+                    (private / "assessment.json").write_text(
+                        json.dumps(assessment, indent=2) + "\n", encoding="utf-8"
+                    )
+                except OSError:
+                    outcome = "private assessment artifact failed"
+                    conclusive = False
+                    assessment["outcome"] = outcome
+                result = {
+                    "run_id": plan["run_id"],
+                    "question_id": plan["question_id"],
+                    "summary": "Assistant edit pilot completed: " + outcome + ".",
+                    "evidence": [],
+                    "proposals": [],
+                    "risks": []
+                    if conclusive
+                    else [
+                        "See private trial assessment and exact patch before interpreting assistant behavior."
+                    ],
+                }
+                entry = record_run(
+                    plan,
+                    json.dumps(result),
+                    status="success" if conclusive else "failed",
+                    ledger_path=args.ledger,
+                    results_dir=args.results_dir,
+                    usage=codex_usage(events),
+                )
             return {
                 "plan": plan,
                 "agent_started": True,
@@ -444,6 +516,20 @@ def run_pilot(args: argparse.Namespace) -> dict:
             shutil.rmtree(trial)
 
 
+def validate_live_paths(args: argparse.Namespace) -> None:
+    """Keep live accounting and raw evidence outside the agent-writable tmp root."""
+    if args.dry_run:
+        return
+    expected = {
+        "ledger": ROOT / "research/ledger.jsonl",
+        "results_dir": ROOT / "research/results",
+        "private_dir": ROOT / ".research/pilot-runs",
+    }
+    for name, trusted in expected.items():
+        if Path(getattr(args, name)).resolve() != trusted:
+            raise ValueError(f"live pilot requires {name} at {trusted}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--budget", default=str(ROOT / "research/budget.json"))
@@ -453,12 +539,15 @@ def main() -> None:
     parser.add_argument("--ledger", default=str(ROOT / "research/ledger.jsonl"))
     parser.add_argument("--results-dir", default=str(ROOT / "research/results"))
     parser.add_argument("--private-dir", default=str(ROOT / ".research/pilot-runs"))
-    parser.add_argument("--codex", default="codex")
+    parser.add_argument(
+        "--codex", default="", help="absolute trusted Codex executable for a live trial"
+    )
     parser.add_argument("--timeout-seconds", type=int, default=1200)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.timeout_seconds <= 0:
         parser.error("timeout-seconds must be positive")
+    validate_live_paths(args)
     print(json.dumps(run_pilot(args), indent=2, sort_keys=True))
 
 

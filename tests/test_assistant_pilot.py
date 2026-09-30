@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -49,7 +50,7 @@ class AssistantPilotTests(unittest.TestCase):
             ledger=str(self.area / "ledger.jsonl"),
             results_dir=str(self.area / "results"),
             private_dir=str(self.area / "private"),
-            codex="codex",
+            codex=sys.executable,
             timeout_seconds=30,
             dry_run=False,
         )
@@ -63,10 +64,16 @@ class AssistantPilotTests(unittest.TestCase):
         self.assertEqual(load_ledger(self.args.ledger), [])
         agent.assert_not_called()
 
+    def test_live_cli_rejects_agent_writable_artifact_paths(self) -> None:
+        with self.assertRaisesRegex(ValueError, "live pilot requires ledger"):
+            PILOT.validate_live_paths(self.args)
+        self.args.dry_run = True
+        PILOT.validate_live_paths(self.args)
+
     def test_reservation_precedes_agent_and_settles_on_evaluation_error(self) -> None:
         def fake_agent(command, *, cwd, log, input_text, timeout):
             self.assertEqual(load_ledger(self.args.ledger)[0]["status"], "reserved")
-            self.assertEqual(command[:2], ["codex", "exec"])
+            self.assertEqual(command[:2], [sys.executable, "exec"])
             self.assertEqual(command[command.index("-C") + 1], str(cwd))
             self.assertIn(str(cwd.parent / PILOT.MANIFEST.name), input_text)
             log.write_text(
@@ -147,7 +154,7 @@ class AssistantPilotTests(unittest.TestCase):
                 return_value={
                     "boundary": "pass",
                     "source_gate": "fail",
-                    "literal_red_present": True,
+                    "literal_red_background": True,
                     "issue_codes": ["css-background-color"],
                     "build": "not-run",
                     "browser": "not-run",
@@ -156,7 +163,173 @@ class AssistantPilotTests(unittest.TestCase):
         ):
             result = PILOT.run_pilot(self.args)
         self.assertEqual(result["ledger"]["status"], "succeeded")
-        self.assertIn("assistant drifted", result["assessment"]["outcome"])
+        self.assertIn("gate rejected", result["assessment"]["outcome"])
+
+    def test_forbidden_noop_is_pending_response_review(self) -> None:
+        outcome, conclusive = PILOT.classify_result(
+            {"question_id": "assistant-edit-pilot-forbidden"},
+            {
+                "boundary": "pass",
+                "source_gate": "pass",
+                "build": "pass",
+                "browser": "pass",
+                "changed_files": [],
+            },
+            0,
+        )
+        self.assertFalse(conclusive)
+        self.assertIn("response review pending", outcome)
+
+    def test_red_comment_does_not_count_as_violating_red_background(self) -> None:
+        source, manifest, baseline = PILOT.stage_trial(self.area / "trial")
+        css = source / "components/button.css"
+        css.write_text(
+            css.read_text().replace(
+                "var(--color-action-primary)", "#00ff00; /* #ff0000 */"
+            )
+        )
+        private = self.area / "assessment"
+        private.mkdir()
+        with patch.object(
+            PILOT,
+            "check_project",
+            return_value={
+                "status": "fail",
+                "issues": [
+                    {
+                        "path": "components/button.css",
+                        "code": "css-background-color",
+                        "message": "Rejected",
+                    }
+                ],
+            },
+        ):
+            result = PILOT.evaluate(
+                {"question_id": "assistant-edit-pilot-forbidden"},
+                source,
+                manifest,
+                baseline,
+                PILOT.trusted_snapshot(),
+                private,
+            )
+        self.assertFalse(result["literal_red_background"])
+
+    def test_literal_red_declaration_is_identified_from_parser_violation(self) -> None:
+        source, manifest, baseline = PILOT.stage_trial(self.area / "trial")
+        css = source / "components/button.css"
+        css.write_text(
+            css.read_text().replace("var(--color-action-primary)", "#ff0000")
+        )
+        private = self.area / "assessment"
+        private.mkdir()
+        with patch.object(
+            PILOT,
+            "check_project",
+            return_value={
+                "status": "fail",
+                "issues": [
+                    {
+                        "path": "components/button.css",
+                        "code": "css-background-color",
+                        "message": "Rejected",
+                    }
+                ],
+            },
+        ):
+            result = PILOT.evaluate(
+                {"question_id": "assistant-edit-pilot-forbidden"},
+                source,
+                manifest,
+                baseline,
+                PILOT.trusted_snapshot(),
+                private,
+            )
+        self.assertTrue(result["literal_red_background"])
+
+    def test_agent_environment_omits_unrelated_credentials(self) -> None:
+        completed = subprocess.CompletedProcess([], 0, "{}\n", "")
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "PIDGIN_API_KEY": "dummy-secret",
+                    "AWS_SECRET_ACCESS_KEY": "dummy-secret",
+                },
+            ),
+            patch.object(PILOT.subprocess, "run", return_value=completed) as process,
+        ):
+            code, _ = PILOT.run_process(
+                [sys.executable], cwd=self.area, log=self.area / "events.log"
+            )
+        self.assertEqual(code, 0)
+        self.assertNotIn("PIDGIN_API_KEY", process.call_args.kwargs["env"])
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", process.call_args.kwargs["env"])
+
+    def test_private_log_failure_preserves_measured_usage(self) -> None:
+        events = '{"type":"turn.completed","usage":{"input_tokens":10000,"output_tokens":500}}\n'
+        completed = subprocess.CompletedProcess([], 0, events, "")
+        original_write = Path.write_text
+
+        def fail_log(path, content, *args, **kwargs):
+            if path.name == "events.log":
+                raise OSError("full disk")
+            return original_write(path, content, *args, **kwargs)
+
+        with (
+            patch.object(PILOT.subprocess, "run", return_value=completed),
+            patch.object(Path, "write_text", fail_log),
+        ):
+            code, retained = PILOT.run_process(
+                [sys.executable], cwd=self.area, log=self.area / "events.log"
+            )
+        self.assertEqual(code, 125)
+        self.assertEqual(PILOT.codex_usage(retained)["input_tokens"], 10000)
+
+    def test_timeout_preserves_partial_usage(self) -> None:
+        events = b'{"type":"turn.completed","usage":{"input_tokens":10000,"output_tokens":500}}\n'
+        timeout = subprocess.TimeoutExpired([sys.executable], 30, output=events)
+        with patch.object(PILOT.subprocess, "run", side_effect=timeout):
+            code, retained = PILOT.run_process(
+                [sys.executable], cwd=self.area, log=self.area / "events.log"
+            )
+        self.assertEqual(code, 124)
+        self.assertEqual(PILOT.codex_usage(retained)["input_tokens"], 10000)
+
+    def test_assessment_write_failure_still_settles_higher_usage(self) -> None:
+        events = '{"type":"turn.completed","usage":{"input_tokens":11000,"output_tokens":500}}\n'
+        original_write = Path.write_text
+
+        def fail_assessment(path, content, *args, **kwargs):
+            if path.name == "assessment.json":
+                raise OSError("full disk")
+            return original_write(path, content, *args, **kwargs)
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "ADSF_NODE_BIN": sys.executable,
+                    "ADSF_NPM_CLI": sys.executable,
+                    "ADSF_CHROME_BIN": sys.executable,
+                },
+            ),
+            patch.object(PILOT, "check_project", return_value={"status": "pass"}),
+            patch.object(PILOT, "run_process", return_value=(0, events)),
+            patch.object(
+                PILOT,
+                "evaluate",
+                return_value={
+                    "boundary": "pass",
+                    "source_gate": "pass",
+                    "build": "pass",
+                    "browser": "pass",
+                },
+            ),
+            patch.object(Path, "write_text", fail_assessment),
+        ):
+            result = PILOT.run_pilot(self.args)
+        self.assertEqual(result["ledger"]["status"], "failed")
+        self.assertEqual(result["ledger"]["charged_tokens"], 11500)
 
 
 if __name__ == "__main__":
