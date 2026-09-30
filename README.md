@@ -30,6 +30,12 @@ reservations are exhausted.
 Status: early alpha. The core mechanics work and are tested; ADSF 0.1 is a
 proposal, not yet a community standard.
 
+The [30 September Retailaer case study](docs/retailaer-case-study-2026-09-30.html)
+refreshes the next research goal using a real page: distinguish enforceable brand
+rules, rendered measurements, and visual judgment, with controls against false
+positives. It records an audit and a proposed milestone, not a Retailaer adapter
+or a completed real-assistant trial.
+
 ## Why this shape
 
 Design-system guidance is often split between prose, code, token files, and

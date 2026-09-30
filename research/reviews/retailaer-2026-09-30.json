@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-09-30",
+  "scope": "Retailaer screenshot evaluation and ADSF research check-in; no application changes",
+  "research_commit": "0f92883349d865a6fe78e1f2beb935215b22517f",
+  "remote_main": "2fe602747835114c2b9f994586ac7ab28b6b18cd",
+  "verification": {
+    "unit_tests": 132,
+    "conformance_cases": 9,
+    "css_workflow": "passed",
+    "project_workflow": "passed",
+    "example_flow": "three coercions repaired; accessible-name warning retained",
+    "pilot_dry_run": "skip; daily run limit reached; agent_started false",
+    "mobile": "unverified; requested viewport not applied",
+    "report_rendering": "static validation only",
+    "checkpoint_scope": "Recorded tests ran against the initial clean checkpoint. Later unrelated policy, fingerprint and test edits appeared in the shared checkout and are not certified by these results."
+  },
+  "deterministic_evidence": {
+    "supplied_image": {
+      "name": "image-1.png",
+      "sha256": "0cea6f8be41e603952cde62ce19e958cc34a7dfa2b0bb1305476d008fb702455"
+    },
+    "brand_readme": {
+      "name": "readme.md",
+      "sha256": "64484ba310fbcc6669e8e0103747141eb7b82a492ed01218fa743ffa80ad6156"
+    },
+    "website_tokens": {
+      "name": "design-system.css",
+      "sha256": "8ae3bdb2cae6def9c1344468b3045ceb2bf38a0382e4c1332883715dbb1e3799"
+    },
+    "approved_logo": {
+      "name": "logo_mint_eaf2f2.svg",
+      "sha256": "e9adb34ba83dcc52f36f01c7c83eda4bfb8c5ea7383f13d78a723af371d5da46"
+    },
+    "browser_verifier": {
+      "name": "browser-verify.cjs",
+      "sha256": "3b2844806d3914a1ded7467d9632e7a2cee693d129d3b389aa4d13bee0d563f5"
+    },
+    "contrast_calculations": {
+      "current_cta_193536_on_d9b88f": 6.985,
+      "canonical_grey_on_dark_teal": 2.298,
+      "mint_on_dark_teal": 8.732,
+      "scope": "opaque color pairs only; no complete accessibility audit"
+    },
+    "button_calculation": {
+      "width": 282.140625,
+      "height": 53,
+      "outer_inset_left": 21,
+      "outer_inset_right": 21,
+      "gap": 30,
+      "icon_width": 19,
+      "label_advance_width": 191.140625,
+      "label_center_offset_left": 24.5,
+      "content_group_center_error": 0,
+      "note": "CSS box calculation, not glyph-ink optical centering"
+    }
+  },
+  "textual_evidence": {
+    "brand_rules": {
+      "logo": "Use the supplied Retailaer wordmark, preserve its 160:28 proportions, use mint on dark teal. Do not redraw or recolor outside supplied variants.",
+      "fonts": "Open Sans throughout, regular, semibold and bold. Collateral title guidance specifies bold. Monospace is not specified.",
+      "palette": "Primary #2C6362, sand #D9B88F, grey #787A7A, mint #EAF2F2, body ink #2B2F2F, white #FFFFFF and dark teal #21494A. Do not introduce colors outside this set.",
+      "layout": "Left-align body text; consistent gaps. Print guidelines give inch margins and pt type sizes. No rule says button, copy and heading must have identical widths or that hero tile tops must align with heading tops.",
+      "web_tokens": "Named spacing values 8,16,24,32,48,64,96px. The actual live homepage CTA nevertheless uses 17px vertical and 34px horizontal padding. No per-component Retailaer enforcement contract exists in the research project."
+    },
+    "local_observations": {
+      "logo": "HTML anchor containing plain lowercase retail plus span aer; aer is sand. No supplied image or SVG wordmark.",
+      "fonts": "Arial Helvetica sans-serif for interface; h1 font weight 400; ui-monospace for labels.",
+      "palette": "sand and mint match; background #142D2E and panel #102627 are not documented tokens.",
+      "geometry": "At 1196 CSS-pixel desktop viewport: button width 282.140625 and height 53; 20px horizontal padding plus 1px border each side, label then 30px gap then 19px arrow. Label advance width inferred from box is 191.140625. Combined label+gap+arrow group is centered with equal 21px outer insets. Label alone is 24.5px left of the whole button center. h1, body, button share identical x=682.90625. Heading box width443.7265625, body365, button282.140625. Left column outer top149.65625, right149; left bottom431.7421875, right432.40625. Tile tops189.15625 due to kicker; headline top149. Digit cards use place-items center with negative letter spacing and compensating right padding.",
+      "radius": "Button border radius3px; live homepage CTA radius999px, width271.93359375. The base website button CSS uses a 32px radius.",
+      "responsive": "Styles include media queries, but requested viewport375 was not applied: actual local viewport stayed1196. No mobile rendering pass exists."
+    },
+    "research_scope": "ADSF repository has 132 unit tests and nine conformance cases passing. CSS policy validates declared values, not general geometry. Its one static React browser fixture checks button foreground/background and, in one controlled edit, exact text and vertical padding. Does not certify arbitrary pages, asset logo identity, optical balance, full visual fidelity, accessibility or runtime behavior. Real assistant-edit pilot not run. Mocked-agent tests and controlled edits are not evidence of real assistant adherence.",
+    "live_reference_conflict": {
+      "highlight_color": "#8A5C2B",
+      "status": "Observed in live homepage, absent from short documented palette; approval rationale not established. Not included in the earlier Jev batch."
+    }
+  },
+  "claims": {
+    "logo": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The text-built local logo violates the documented supplied-wordmark requirement. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "font": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The local Arial interface violates the specified Open Sans brand font. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "palette": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The local background and panel shades are outside the documented palette. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "button_center": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The entire button label-and-arrow group is geometrically off-center. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "width_rule": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The documented design system requires the CTA, body copy and heading to have the same width. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "tile_alignment": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The documentation proves the hero is noncompliant because tile tops are lower than the heading. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "all_spacing": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: Every valid Retailaer web spacing value must be a multiple of eight pixels. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "app_pass": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The research project passing 132 tests proves this Retailaer page is visually compliant. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "pilot": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: Passing mocked-agent tests proves a real assistant has followed this system while editing. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    },
+    "mobile": {
+      "type": "choice",
+      "instructions": "Adversarially check this claim against only the supplied evidence: The current review has verified that the page works at a 375px mobile viewport. Treat observations, normative requirements, and reviewer preferences as different kinds of evidence. Does the evidence support the whole claim?",
+      "criteria": {
+        "supported": "The supplied evidence directly supports the whole claim.",
+        "contradicted": "The supplied evidence directly conflicts with the claim.",
+        "not_established": "The evidence lacks an authoritative rule or sufficient coverage to establish the claim."
+      }
+    }
+  },
+  "jev": {
+    "response": {
+      "model": "jev-1.13.0",
+      "answers": {
+        "font": {
+          "type": "choice",
+          "choice": "supported",
+          "confidence": 0.8,
+          "probabilities": {
+            "not_established": 0.13,
+            "contradicted": 0.0,
+            "supported": 0.87
+          }
+        },
+        "palette": {
+          "type": "choice",
+          "choice": "supported",
+          "confidence": 0.92,
+          "probabilities": {
+            "contradicted": 0.0,
+            "not_established": 0.05,
+            "supported": 0.95
+          }
+        },
+        "width_rule": {
+          "type": "choice",
+          "choice": "contradicted",
+          "confidence": 0.81,
+          "probabilities": {
+            "contradicted": 0.88,
+            "not_established": 0.12,
+            "supported": 0.0
+          }
+        },
+        "app_pass": {
+          "type": "choice",
+          "choice": "contradicted",
+          "confidence": 0.6,
+          "probabilities": {
+            "contradicted": 0.74,
+            "not_established": 0.26,
+            "supported": 0.0
+          }
+        },
+        "pilot": {
+          "type": "choice",
+          "choice": "contradicted",
+          "confidence": 0.79,
+          "probabilities": {
+            "contradicted": 0.86,
+            "not_established": 0.14,
+            "supported": 0.0
+          }
+        },
+        "logo": {
+          "type": "choice",
+          "choice": "supported",
+          "confidence": 0.56,
+          "probabilities": {
+            "not_established": 0.27,
+            "contradicted": 0.02,
+            "supported": 0.71
+          }
+        },
+        "button_center": {
+          "type": "choice",
+          "choice": "contradicted",
+          "confidence": 0.71,
+          "probabilities": {
+            "contradicted": 0.81,
+            "not_established": 0.13,
+            "supported": 0.06
+          }
+        },
+        "tile_alignment": {
+          "type": "choice",
+          "choice": "not_established",
+          "confidence": 0.81,
+          "probabilities": {
+            "contradicted": 0.12,
+            "not_established": 0.88,
+            "supported": 0.0
+          }
+        },
+        "all_spacing": {
+          "type": "choice",
+          "choice": "contradicted",
+          "confidence": 0.27,
+          "probabilities": {
+            "contradicted": 0.51,
+            "not_established": 0.47,
+            "supported": 0.02
+          }
+        },
+        "mobile": {
+          "type": "choice",
+          "choice": "contradicted",
+          "confidence": 0.99,
+          "probabilities": {
+            "not_established": 0.0,
+            "contradicted": 1.0,
+            "supported": 0.0
+          }
+        }
+      },
+      "usage": {
+        "input_tokens": 2486,
+        "output_tokens": 451
+      }
+    },
+    "latency_seconds": 0.441
+  },
+  "reviewer_adjudication": {
+    "logo": "supported",
+    "font": "supported",
+    "palette": "supported",
+    "button_center": "contradicted",
+    "width_rule": "not_established",
+    "tile_alignment": "not_established",
+    "all_spacing": "contradicted",
+    "app_pass": "not_established",
+    "pilot": "not_established",
+    "mobile": "contradicted"
+  },
+  "cost_usd": "0.000104412",
+  "future_goal": "Prove real-page assistant adherence using a reviewed Retailaer contract, deterministic source/build checks, rendered assertions, controls against false positives, and a separately budgeted actual-assistant trial. This goal is planned, not implemented.",
+  "shared_checkout": "Other concurrent changes left untouched; this session owns only README addition, HTML review and this JSON ledger."
+}
