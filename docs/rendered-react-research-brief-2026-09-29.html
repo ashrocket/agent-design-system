@@ -51,7 +51,7 @@
   </header>
   <div class="body">
     <div class="metrics" aria-label="Verified local results">
-      <div class="metric"><strong>129</strong><span>unit tests passed locally</span></div>
+      <div class="metric"><strong>132</strong><span>unit tests passed locally</span></div>
       <div class="metric"><strong>6</strong><span>app source files accounted for</span></div>
       <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
     </div>
@@ -80,10 +80,11 @@
       <p>This is one <strong>fixed static React app profile</strong>, not arbitrary app coverage. The host and entry are reviewed byte-for-byte rather than semantically parsed. The browser asserts the button’s foreground and background, plus exact text and vertical padding in the controlled edit mode. Routes, interactions, dynamic component graphs, server behavior, and full visual fidelity still need coverage.</p>
       <p>The browser command accepts an unsigned attestation, so its source provenance depends on the trusted Python verifier-to-browser handoff. CI is wired but has not been observed remotely at an exact commit. A blind assistant run is still unmeasured; the approved edit was a controlled local experiment.</p>
       <p class="kicker">Next decisive experiment</p>
-      <p>The new pilot runner prepares a disposable Git-backed copy, gives the assistant context that points to that copy, reserves the shared budget before launching Codex, and evaluates the source patch, then the build and browser when the source gate passes. Panel review tightened its inherited environment, executable selection, protected artifact paths, usage settlement, and result labels. The tests distinguish a red declaration caught by the gate from a harmless comment, and leave a no-edit assistant response pending human review. The real staged copy passed the source gate.</p>
-      <p>The shared ledger has already used its one run for 30 September, so the runner returned <code>skip</code> without starting an assistant. We still need to prove the exact Codex exec writable roots and loaded tools before spending a future run. A protected base-ref CI run remains necessary before claiming this boundary holds in a normal assistant-edited PR.</p>
+      <p>The pilot runner prepares a disposable Git-backed copy, gives the assistant context that points to that copy, reserves the shared budget before launching Codex, and evaluates the source patch, then the build and browser when the source gate passes. Panel review tightened its inherited environment, executable selection, protected artifact paths, usage settlement, and result labels. The tests distinguish a red declaration caught by the gate from a harmless comment, and leave a no-edit assistant response pending human review. The real staged copy passed the source gate.</p>
+      <p>The pilot command now disables four known Codex feature surfaces: plugins, apps, browser use, and hooks. Its JSONL audit rejects incomplete streams and unknown tool items; a conclusive edited result must also show a command or file-change event. A local configured-server listing still showed enabled Pidgin and 1Password entries, and the plugin listing showed enabled plugins. Those listings cannot establish the effective tools inside <code>codex exec --ignore-user-config</code>; post-run events also cannot prove what was offered. The exact runtime tool and writable-root boundary remains unverified.</p>
+      <p>The shared ledger has already used its one run for 30 September, so the runner returned <code>skip</code> without starting an assistant. A future controlled assistant run and a protected base-ref CI run are necessary before claiming this boundary holds in a normal assistant-edited PR.</p>
     </section>
-    <footer>30 September update: 129 unit tests, nine conformance cases, Ruff, mypy, source/build verification, and prior Chromium 154 checks passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; live recovery remains unverified. The assistant-edit runner is tested locally but has not launched a real assistant. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
+    <footer>30 September update: 132 unit tests, nine conformance cases, Ruff, mypy, source/build verification, and prior Chromium 154 checks passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; live recovery remains unverified. The assistant-edit runner is tested locally but has not launched a real assistant. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
   </div>
 </main>
 </body>

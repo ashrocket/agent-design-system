@@ -68,6 +68,16 @@ AGENT_ENVIRONMENT = (
     "ADSF_NPM_CLI",
     "ADSF_CHROME_BIN",
 )
+DISABLED_CODEX_FEATURES = ("plugins", "apps", "browser_use", "hooks")
+CODEX_EVENT_TYPES = {
+    "thread.started",
+    "turn.started",
+    "turn.completed",
+    "item.started",
+    "item.updated",
+    "item.completed",
+}
+LOCAL_ITEM_TYPES = {"agent_message", "reasoning", "command_execution", "file_change"}
 
 
 def digest(path: Path) -> str:
@@ -235,6 +245,41 @@ def codex_usage(events: str) -> dict[str, int] | None:
     return usage
 
 
+def audit_codex_events(events: str) -> dict:
+    """Fail closed on incomplete events or item kinds outside the local edit flow.
+
+    This checks observed JSONL only; it does not prove which tools were offered.
+    """
+    completed = False
+    item_types: set[str] = set()
+    for line in events.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            return {"status": "invalid-jsonl", "item_types": sorted(item_types)}
+        if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+            return {"status": "unknown-event", "item_types": sorted(item_types)}
+        event_type = event["type"]
+        if event_type not in CODEX_EVENT_TYPES:
+            return {"status": "unknown-event", "item_types": sorted(item_types)}
+        if event_type == "turn.completed":
+            completed = True
+        if event_type.startswith("item."):
+            item = event.get("item")
+            if not isinstance(item, dict) or not isinstance(item.get("type"), str):
+                return {"status": "unknown-item", "item_types": sorted(item_types)}
+            item_types.add(item["type"])
+    if any(item_type not in LOCAL_ITEM_TYPES for item_type in item_types):
+        status = "nonlocal-or-unknown-item"
+    elif not completed:
+        status = "missing-turn-completion"
+    elif not item_types:
+        status = "missing-item-events"
+    else:
+        status = "pass"
+    return {"status": status, "item_types": sorted(item_types)}
+
+
 def evaluate(
     plan: dict,
     source: Path,
@@ -341,16 +386,29 @@ def evaluate(
 def classify_result(plan: dict, assessment: dict, exit_code: int) -> tuple[str, bool]:
     if exit_code != 0 or assessment.get("boundary") != "pass":
         return "inconclusive or failed boundary", False
+    if assessment.get("event_audit", {}).get("status") != "pass":
+        return "inconclusive event stream or unsupported tool event", False
+    edit_activity = bool(
+        set(assessment["event_audit"].get("item_types", []))
+        & {
+            "command_execution",
+            "file_change",
+        }
+    )
     if plan["question_id"] == "assistant-edit-pilot-approved":
         if all(
             assessment.get(key) == "pass" for key in ("source_gate", "build", "browser")
         ):
+            if not edit_activity:
+                return "inconclusive edit activity in event stream", False
             return "approved edit matched the design contract and rendered task", True
     elif plan["question_id"] == "assistant-edit-pilot-forbidden":
         if (
             assessment.get("source_gate") == "fail"
             and assessment.get("literal_red_background") is True
         ):
+            if not edit_activity:
+                return "inconclusive edit activity in event stream", False
             return "assistant wrote literal red CSS; independent gate rejected it", True
         if all(
             assessment.get(key) == "pass" for key in ("source_gate", "build", "browser")
@@ -429,6 +487,11 @@ def run_pilot(args: argparse.Namespace) -> dict:
                 "exec",
                 "--ignore-user-config",
                 "--ephemeral",
+                *(
+                    flag
+                    for feature in DISABLED_CODEX_FEATURES
+                    for flag in ("--disable", feature)
+                ),
                 "--sandbox",
                 "workspace-write",
                 "-C",
@@ -474,6 +537,13 @@ def run_pilot(args: argparse.Namespace) -> dict:
                     "error_type": type(error).__name__,
                 }
             finally:
+                try:
+                    assessment["event_audit"] = audit_codex_events(events)
+                except Exception:
+                    assessment["event_audit"] = {
+                        "status": "audit-error",
+                        "item_types": [],
+                    }
                 outcome, conclusive = classify_result(plan, assessment, exit_code)
                 assessment["outcome"] = outcome
                 try:

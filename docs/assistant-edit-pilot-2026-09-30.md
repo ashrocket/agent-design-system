@@ -30,12 +30,18 @@ static one-button page as general React coverage.
   that copy. The agent receives those design rules before editing; the
   external verifier uses the trusted checkout and the same fingerprint.
 - Use `codex exec --ignore-user-config --ephemeral --sandbox workspace-write`
-  with `-C` set to the isolated source child. Preserve the JSONL event stream,
+  with `-C` set to the isolated source child. Disable the local CLI's
+  `plugins`, `apps`, `browser_use`, and `hooks` features for the trial. Preserve
+  the JSONL event stream,
   prompt, final message, exit code, and exact patch in a **private, untracked**
   location; persist only a safe digest and measured usage in the ledger. The
   flag excludes the user's config file, not all plugin or exec-policy sources.
   A Codex sandbox is part of the isolation claim; prove its actual writable
-  roots and loaded tool inventory in a no-agent preflight.
+  roots and effective loaded tool inventory before relying on that claim.
+  The runner checks the observed event stream and marks missing, malformed,
+  or nonlocal tool events inconclusive. That post-run check cannot prove which
+  tools were available to the assistant. A conclusive edited result also
+  requires a recorded command or file-change item.
 - Before **each** agent process, plan with
   `research/assistant-pilot-questions.json` and the shared budget/ledger.
   `scripts/run-assistant-pilot.py` plans under the shared ledger lock, prepares
@@ -125,6 +131,16 @@ must be treated as agent-writable, compared against trusted hashes afterward,
 and generated only after the agent exits where possible. The exact `codex exec`
 writable-root behavior and tool/plugin inventory still need proof before
 the first budgeted pilot.
+
+The local CLI's configured-server listing included enabled Pidgin and 1Password
+servers; its installed-plugin listing included enabled plugins. Those listings
+are useful diagnostics but are not the effective inventory of an
+`exec --ignore-user-config` process. The runner now passes explicit feature
+disables for plugins, apps, browser use, and hooks, and accepts a conclusive
+outcome only when the JSONL event stream completes with locally recognized
+edit items. This reduces known contamination routes; it does not establish
+that the process was offered no connected tools. A controlled runner/account
+and a matching effective-tool preflight remain necessary for that claim.
 
 A staged trial copy with its own Git baseline passed the trusted source/build
 verifier. Exporting context from a sibling manifest emitted a gate command

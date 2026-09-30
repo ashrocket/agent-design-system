@@ -74,6 +74,11 @@ class AssistantPilotTests(unittest.TestCase):
         def fake_agent(command, *, cwd, log, input_text, timeout):
             self.assertEqual(load_ledger(self.args.ledger)[0]["status"], "reserved")
             self.assertEqual(command[:2], [sys.executable, "exec"])
+            for feature in PILOT.DISABLED_CODEX_FEATURES:
+                self.assertIn(
+                    ["--disable", feature],
+                    [command[i : i + 2] for i in range(len(command) - 1)],
+                )
             self.assertEqual(command[command.index("-C") + 1], str(cwd))
             self.assertIn(str(cwd.parent / PILOT.MANIFEST.name), input_text)
             log.write_text(
@@ -134,8 +139,12 @@ class AssistantPilotTests(unittest.TestCase):
 
         def fake_agent(command, *, cwd, log, input_text, timeout):
             self.assertEqual(load_ledger(self.args.ledger)[0]["status"], "reserved")
-            log.write_text("")
-            return 0, ""
+            events = (
+                '{"type":"item.completed","item":{"type":"file_change"}}\n'
+                '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n'
+            )
+            log.write_text(events)
+            return 0, events
 
         with (
             patch.dict(
@@ -174,6 +183,7 @@ class AssistantPilotTests(unittest.TestCase):
                 "build": "pass",
                 "browser": "pass",
                 "changed_files": [],
+                "event_audit": {"status": "pass", "item_types": ["agent_message"]},
             },
             0,
         )
@@ -294,6 +304,83 @@ class AssistantPilotTests(unittest.TestCase):
             )
         self.assertEqual(code, 124)
         self.assertEqual(PILOT.codex_usage(retained)["input_tokens"], 10000)
+
+    def test_event_audit_rejects_connected_and_unknown_tools(self) -> None:
+        for item_type in ("mcp_tool_call", "web_search", "future_tool"):
+            events = (
+                json.dumps({"type": "item.completed", "item": {"type": item_type}})
+                + '\n{"type":"turn.completed"}\n'
+            )
+            audit = PILOT.audit_codex_events(events)
+            self.assertEqual(audit["status"], "nonlocal-or-unknown-item")
+            outcome, conclusive = PILOT.classify_result(
+                {"question_id": "assistant-edit-pilot-approved"},
+                {
+                    "boundary": "pass",
+                    "source_gate": "pass",
+                    "build": "pass",
+                    "browser": "pass",
+                    "event_audit": audit,
+                },
+                0,
+            )
+            self.assertFalse(conclusive)
+            self.assertIn("event stream", outcome)
+
+    def test_event_audit_requires_complete_parseable_stream(self) -> None:
+        self.assertEqual(
+            PILOT.audit_codex_events("")["status"], "missing-turn-completion"
+        )
+        self.assertEqual(
+            PILOT.audit_codex_events('{"type":"turn.completed"}\n')["status"],
+            "missing-item-events",
+        )
+        self.assertEqual(
+            PILOT.audit_codex_events("not json\n")["status"], "invalid-jsonl"
+        )
+        self.assertEqual(
+            PILOT.audit_codex_events('{"type":[]}\n')["status"], "unknown-event"
+        )
+        self.assertEqual(
+            PILOT.audit_codex_events('{"type":"turn.failed"}\n')["status"],
+            "unknown-event",
+        )
+        self.assertEqual(
+            PILOT.audit_codex_events(
+                '{"type":"item.completed","item":{"type":"command_execution"}}\n'
+                '{"type":"turn.completed"}\n'
+            )["status"],
+            "pass",
+        )
+
+    def test_malformed_event_still_settles_reserved_run(self) -> None:
+        events = '{"type":[]}\n'
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "ADSF_NODE_BIN": sys.executable,
+                    "ADSF_NPM_CLI": sys.executable,
+                    "ADSF_CHROME_BIN": sys.executable,
+                },
+            ),
+            patch.object(PILOT, "check_project", return_value={"status": "pass"}),
+            patch.object(PILOT, "run_process", return_value=(0, events)),
+            patch.object(
+                PILOT,
+                "evaluate",
+                return_value={
+                    "boundary": "pass",
+                    "source_gate": "pass",
+                    "build": "pass",
+                    "browser": "pass",
+                },
+            ),
+        ):
+            result = PILOT.run_pilot(self.args)
+        self.assertEqual(result["assessment"]["event_audit"]["status"], "unknown-event")
+        self.assertEqual(result["ledger"]["status"], "failed")
+        self.assertEqual(result["ledger"]["charged_tokens"], 9000)
 
     def test_assessment_write_failure_still_settles_higher_usage(self) -> None:
         events = '{"type":"turn.completed","usage":{"input_tokens":11000,"output_tokens":500}}\n'
