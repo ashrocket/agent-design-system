@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -49,11 +50,36 @@ class FormatError(ValueError):
 
 def load_json(path: str | Path) -> Any:
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        return json.loads(
+            Path(path).read_text(encoding="utf-8"),
+            parse_constant=_invalid_constant,
+            parse_float=_finite_float,
+            object_pairs_hook=_unique_object,
+        )
     except OSError as error:
         raise FormatError(f"cannot read {path}: {error}") from error
-    except json.JSONDecodeError as error:
+    except ValueError as error:
         raise FormatError(f"invalid JSON in {path}: {error}") from error
+
+
+def _invalid_constant(value: str) -> Any:
+    raise ValueError(f"non-finite number {value} is not JSON")
+
+
+def _finite_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"non-finite number {value} is not supported")
+    return number
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    output: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in output:
+            raise ValueError(f"duplicate object key: {key}")
+        output[key] = value
+    return output
 
 
 def collect_tokens(tree: dict[str, Any]) -> dict[str, Token]:
@@ -94,7 +120,7 @@ def resolve_token_value(
     return value
 
 
-def validate_design_system(system: Any) -> list[str]:
+def validate_design_system(system: Any, *, css: bool = True) -> list[str]:
     errors: list[str] = []
     if not isinstance(system, dict):
         return ["document root must be an object"]
@@ -197,16 +223,15 @@ def validate_design_system(system: Any) -> list[str]:
         except SelectorError as error:
             errors.append(f"{prefix}: {error}")
         assertion = rule.get("assert", {})
-        if (
-            not isinstance(assertion, dict)
-            or assertion.get("operator") not in ALLOWED_ASSERTIONS
+        if not isinstance(assertion, dict) or assertion.get("operator") not in tuple(
+            ALLOWED_ASSERTIONS
         ):
             errors.append(
                 f"{prefix}.assert.operator must be one of {sorted(ALLOWED_ASSERTIONS)}"
             )
         else:
             _validate_assertion(assertion, f"{prefix}.assert", errors)
-        if rule.get("severity") not in ALLOWED_SEVERITIES:
+        if rule.get("severity") not in tuple(ALLOWED_SEVERITIES):
             errors.append(
                 f"{prefix}.severity must be one of {sorted(ALLOWED_SEVERITIES)}"
             )
@@ -224,32 +249,49 @@ def validate_design_system(system: Any) -> list[str]:
             )
             condition = branch.get("when", {})
             action = branch.get("action", {})
-            if (
-                not isinstance(condition, dict)
-                or condition.get("operator") not in ALLOWED_CONDITIONS
-            ):
+            if not isinstance(condition, dict) or condition.get(
+                "operator"
+            ) not in tuple(ALLOWED_CONDITIONS):
                 errors.append(
                     f"{branch_prefix}.when.operator must be one of {sorted(ALLOWED_CONDITIONS)}"
                 )
             else:
                 _validate_condition(condition, f"{branch_prefix}.when", errors)
-            if (
-                not isinstance(action, dict)
-                or action.get("type") not in ALLOWED_ACTIONS
+            if not isinstance(action, dict) or action.get("type") not in tuple(
+                ALLOWED_ACTIONS
             ):
                 errors.append(
                     f"{branch_prefix}.action.type must be one of {sorted(ALLOWED_ACTIONS)}"
                 )
             else:
                 _validate_action(action, f"{branch_prefix}.action", errors)
-                if rule.get("selector") == "$" and action.get("type") == "coerce":
+                selector = rule.get("selector")
+                if (
+                    isinstance(selector, str)
+                    and (
+                        selector == "$"
+                        or selector.startswith("$.")
+                        and all(part == "**" for part in selector[2:].split("."))
+                    )
+                    and action.get("type") == "coerce"
+                ):
                     errors.append(
                         f"{branch_prefix}.action cannot coerce the document root"
                     )
         if decision and isinstance(decision[-1], dict):
             final_when = decision[-1].get("when", {})
-            if final_when.get("operator") != "always":
+            if (
+                not isinstance(final_when, dict)
+                or final_when.get("operator") != "always"
+            ):
                 errors.append(f"{prefix}.decision must end with an always fallback")
+    if css and not errors and "css" in system.get("extensions", {}):
+        from .css import load_css_policy
+
+        try:
+            load_css_policy(system)
+        except FormatError as error:
+            errors.append(str(error))
     return errors
 
 
@@ -268,7 +310,7 @@ def _validate_token_node(
         unknown = set(node) - {"$type", "$value", "$description", "$extensions"}
         for field in sorted(unknown):
             errors.append(f"{path} has unknown property: {field}")
-        if node.get("$type") not in ALLOWED_TOKEN_TYPES:
+        if node.get("$type") not in tuple(ALLOWED_TOKEN_TYPES):
             errors.append(f"{path}.$type must be one of {sorted(ALLOWED_TOKEN_TYPES)}")
         if (
             not isinstance(node.get("$description"), str)
@@ -281,6 +323,8 @@ def _validate_token_node(
     if not node:
         errors.append(f"{path} must not be empty")
     for key, child in node.items():
+        if re.fullmatch(r"[a-zA-Z0-9_-]+", key) is None:
+            errors.append(f"{path} has an invalid token or group name: {key}")
         if key.startswith("$"):
             errors.append(f"{path} contains reserved group property: {key}")
             continue
@@ -303,7 +347,7 @@ def _validate_assertion(
         and "value" not in assertion
     ):
         errors.append(f"{path}.value is required for {operator}")
-    if operator == "type" and assertion.get("value") not in ALLOWED_VALUE_TYPES:
+    if operator == "type" and assertion.get("value") not in tuple(ALLOWED_VALUE_TYPES):
         errors.append(f"{path}.value must be one of {sorted(ALLOWED_VALUE_TYPES)}")
     if operator == "pattern":
         _validate_regex(assertion.get("value"), f"{path}.value", errors)
@@ -321,11 +365,15 @@ def _validate_condition(
         condition, {"operator", "value", "strategy", "category"}, path, errors
     )
     operator = condition["operator"]
-    if "strategy" in condition and condition["strategy"] not in ALLOWED_STRATEGIES:
+    if "strategy" in condition and condition["strategy"] not in tuple(
+        ALLOWED_STRATEGIES
+    ):
         errors.append(f"{path}.strategy must be one of {sorted(ALLOWED_STRATEGIES)}")
     if "category" in condition and not isinstance(condition["category"], str):
         errors.append(f"{path}.category must be a string")
-    if operator == "value-type" and condition.get("value") not in ALLOWED_VALUE_TYPES:
+    if operator == "value-type" and condition.get("value") not in tuple(
+        ALLOWED_VALUE_TYPES
+    ):
         errors.append(f"{path}.value must be one of {sorted(ALLOWED_VALUE_TYPES)}")
     if operator == "matches":
         _validate_regex(condition.get("value"), f"{path}.value", errors)
@@ -347,7 +395,7 @@ def _validate_action(action: dict[str, Any], path: str, errors: list[str]) -> No
         path,
         errors,
     )
-    if "strategy" in action and action["strategy"] not in ALLOWED_STRATEGIES:
+    if "strategy" in action and action["strategy"] not in tuple(ALLOWED_STRATEGIES):
         errors.append(f"{path}.strategy must be one of {sorted(ALLOWED_STRATEGIES)}")
     if "category" in action and not isinstance(action["category"], str):
         errors.append(f"{path}.category must be a string")

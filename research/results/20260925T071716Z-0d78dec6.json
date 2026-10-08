@@ -1,0 +1,28 @@
+{
+  "charged_tokens": 9000,
+  "error": "agent returned an empty result",
+  "finished_at": "2026-09-25T07:18:49.021031Z",
+  "plan": {
+    "budget_before": {
+      "daily": 0,
+      "monthly": 45000,
+      "weekly": 36000
+    },
+    "budget_limits": {
+      "daily": 12000,
+      "monthly": 280000,
+      "weekly": 70000
+    },
+    "decision": "run",
+    "format": "adsf-research-plan",
+    "planned_at": "2026-09-25T07:17:16.105087Z",
+    "question": "Find the single most consequential ambiguity an implementation agent would encounter when reading the current ADSF format. Show the exact conflicting or underspecified paths, then propose the smallest testable clarification.",
+    "question_id": "agent-ambiguity-audit",
+    "reserved_tokens": 9000,
+    "run_id": "20260925T071716Z-0d78dec6",
+    "version": "0.1.0"
+  },
+  "result": null,
+  "status": "failed",
+  "usage": null
+}

@@ -38,6 +38,9 @@ where = ["src"]
 [tool.setuptools.package-data]
 agent_design_system = [
   "schemas/*.json",
+  "adapters/tsx/*.cjs",
+  "adapters/tsx/package.json",
+  "adapters/tsx/package-lock.json",
   "conformance_suite/*.json",
   "conformance_suite/fixtures/*.json",
 ]

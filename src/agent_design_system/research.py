@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 import uuid
@@ -55,6 +57,7 @@ def load_ledger(path: str | Path) -> list[dict[str, Any]]:
     if not ledger_path.exists():
         return []
     entries: list[dict[str, Any]] = []
+    positions: dict[str, int] = {}
     for line_number, line in enumerate(
         ledger_path.read_text(encoding="utf-8").splitlines(), start=1
     ):
@@ -72,8 +75,110 @@ def load_ledger(path: str | Path) -> list[dict[str, Any]]:
             or "charged_tokens" not in entry
         ):
             raise FormatError(f"invalid ledger entry at {ledger_path}:{line_number}")
-        entries.append(entry)
+        run_id = entry.get("run_id")
+        if isinstance(run_id, str) and run_id in positions:
+            entries[positions[run_id]] = entry
+        else:
+            if isinstance(run_id, str):
+                positions[run_id] = len(entries)
+            entries.append(entry)
     return entries
+
+
+def reserve_run(plan: dict[str, Any], ledger_path: str | Path) -> dict[str, Any]:
+    """Persist the minimum charge before the local agent process starts."""
+    reservation = _validate_run_plan(plan)
+    if any(entry.get("run_id") == plan["run_id"] for entry in load_ledger(ledger_path)):
+        raise FormatError("research run ID is already reserved or recorded")
+    entry = {
+        "run_id": plan["run_id"],
+        "question_id": plan["question_id"],
+        "started_at": plan["planned_at"],
+        "status": "reserved",
+        "reserved_tokens": reservation,
+        "actual_tokens": None,
+        "charged_tokens": reservation,
+        "result_path": None,
+    }
+    _append_ledger(ledger_path, entry, durable=True)
+    return entry
+
+
+def reserve_run_checked(
+    plan: dict[str, Any],
+    ledger_path: str | Path,
+    budget: dict[str, Any],
+    questions_document: dict[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Recheck the shared budget under one lock before a detached agent job."""
+    _validate_run_plan(plan)
+    planned_at = parse_time(plan["planned_at"])
+    age = now - planned_at
+    if (
+        planned_at.date() != now.date()
+        or age < -timedelta(minutes=1)
+        or age > timedelta(minutes=30)
+    ):
+        raise FormatError("research plan is stale or outside the current UTC day")
+    with ledger_lock(ledger_path):
+        current = make_plan(
+            budget, questions_document, load_ledger(ledger_path), now=now
+        )
+        if (
+            current["decision"] != "run"
+            or current["question_id"] != plan.get("question_id")
+            or current["question"] != plan.get("question")
+            or current["reserved_tokens"] != plan.get("reserved_tokens")
+        ):
+            raise FormatError(
+                f"research plan is stale or no longer within budget: {current.get('reason', 'question changed')}"
+            )
+        return reserve_run(plan, ledger_path)
+
+
+def _append_ledger(
+    ledger_path: str | Path, entry: dict[str, Any], *, durable: bool = False
+) -> None:
+    ledger = Path(ledger_path)
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    with ledger.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+        if durable:
+            handle.flush()
+            os.fsync(handle.fileno())
+    if durable:
+        directory_handle = os.open(ledger.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_handle)
+        finally:
+            os.close(directory_handle)
+
+
+def _validate_run_plan(plan: dict[str, Any]) -> int:
+    if not isinstance(plan, dict) or plan.get("decision") != "run":
+        raise FormatError("cannot charge a skipped research plan")
+    if not isinstance(plan.get("run_id"), str) or not re.fullmatch(
+        r"[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}", plan["run_id"]
+    ):
+        raise FormatError("research run ID must match the generated safe format")
+    if not isinstance(plan.get("question_id"), str) or not plan["question_id"]:
+        raise FormatError("research question ID must be a non-empty string")
+    if not isinstance(plan.get("planned_at"), str):
+        raise FormatError("research planned_at must be an ISO timestamp")
+    try:
+        parse_time(plan["planned_at"])
+    except ValueError as error:
+        raise FormatError("research planned_at must be an ISO timestamp") from error
+    reservation = plan.get("reserved_tokens")
+    if (
+        isinstance(reservation, bool)
+        or not isinstance(reservation, int)
+        or reservation <= 0
+    ):
+        raise FormatError("research reservation must be a positive integer")
+    return reservation
 
 
 def budget_windows(config: dict[str, Any], now: datetime) -> list[BudgetWindow]:
@@ -191,14 +296,25 @@ def record_run(
     usage: dict[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    if plan.get("decision") != "run":
-        raise FormatError("cannot record a skipped research plan")
+    reservation = _validate_run_plan(plan)
     for existing in load_ledger(ledger_path):
         if existing.get("run_id") == plan["run_id"]:
-            return existing
+            if (
+                existing.get("question_id") != plan["question_id"]
+                or existing.get("started_at") != plan["planned_at"]
+                or existing.get("reserved_tokens") != reservation
+            ):
+                raise FormatError("research settlement does not match reservation")
+            if existing.get("status") != "reserved":
+                return existing
+            break
     finished_at = (now or datetime.now(UTC)).astimezone(UTC)
-    reservation = int(plan["reserved_tokens"])
-    actual_tokens = _usage_total(usage)
+    usage_error: str | None = None
+    try:
+        actual_tokens = _usage_total(usage)
+    except FormatError as error:
+        actual_tokens = 0
+        usage_error = str(error)
     charged_tokens = max(reservation, actual_tokens)
     normalized_status = "succeeded" if status in {"success", "succeeded"} else "failed"
     result: dict[str, Any] | None = None
@@ -206,8 +322,16 @@ def record_run(
     if result_text.strip():
         try:
             candidate = json.loads(result_text)
-            _validate_research_result(candidate, plan)
-            result = candidate
+            if (
+                normalized_status == "failed"
+                and isinstance(candidate, dict)
+                and isinstance(candidate.get("error"), str)
+                and candidate["error"].strip()
+            ):
+                result_error = _safe_failure_reason(candidate["error"])
+            else:
+                _validate_research_result(candidate, plan)
+                result = candidate
         except (json.JSONDecodeError, FormatError) as error:
             result_error = str(error)
             if normalized_status == "succeeded":
@@ -216,9 +340,12 @@ def record_run(
         result_error = "agent returned an empty result"
         if normalized_status == "succeeded":
             normalized_status = "invalid"
+    if usage_error:
+        result_error = f"{result_error}; {usage_error}" if result_error else usage_error
+        if normalized_status == "succeeded":
+            normalized_status = "invalid"
 
     output_dir = Path(results_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     result_path = output_dir / f"{plan['run_id']}.json"
     result_payload: dict[str, Any] = {
         "plan": plan,
@@ -231,8 +358,17 @@ def record_run(
     if result_error:
         result_payload["error"] = result_error
         if result_text:
-            result_payload["raw_result"] = result_text[:32000]
-    _write_json(result_path, result_payload)
+            result_payload["raw_result_sha256"] = hashlib.sha256(
+                result_text.encode("utf-8")
+            ).hexdigest()
+            result_payload["raw_result_bytes"] = len(result_text.encode("utf-8"))
+    artifact_error: str | None = None
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(result_path, result_payload)
+    except (OSError, TypeError, ValueError) as error:
+        artifact_error = f"result artifact could not be written: {error}"
+        normalized_status = "failed"
 
     entry = {
         "run_id": plan["run_id"],
@@ -243,12 +379,11 @@ def record_run(
         "reserved_tokens": reservation,
         "actual_tokens": actual_tokens if actual_tokens else None,
         "charged_tokens": charged_tokens,
-        "result_path": str(result_path),
+        "result_path": None if artifact_error else str(result_path),
     }
-    ledger = Path(ledger_path)
-    ledger.parent.mkdir(parents=True, exist_ok=True)
-    with ledger.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+    if artifact_error:
+        entry["artifact_error"] = artifact_error
+    _append_ledger(ledger_path, entry, durable=True)
     return entry
 
 
@@ -281,6 +416,7 @@ def run_codex(
         command = [
             codex_executable,
             "exec",
+            "--ignore-user-config",
             "--ephemeral",
             "--sandbox",
             "read-only",
@@ -306,16 +442,20 @@ def run_codex(
                 check=False,
                 timeout=timeout_seconds,
             )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            return json.dumps({"error": str(error)}), None, "failed"
+        except OSError:
+            return json.dumps({"error": "Codex executable unavailable"}), None, "failed"
+        except subprocess.TimeoutExpired:
+            return json.dumps({"error": "Codex attempt timed out"}), None, "failed"
         usage: dict[str, Any] | None = None
         for line in completed.stdout.splitlines():
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if event.get("type") == "turn.completed" and isinstance(
-                event.get("usage"), dict
+            if (
+                isinstance(event, dict)
+                and event.get("type") == "turn.completed"
+                and isinstance(event.get("usage"), dict)
             ):
                 usage = event["usage"]
         result_text = (
@@ -323,8 +463,17 @@ def run_codex(
         )
         status = "success" if completed.returncode == 0 else "failed"
         if not result_text and completed.stderr:
-            result_text = json.dumps({"error": completed.stderr[-4000:]})
+            result_text = json.dumps({"error": _safe_failure_reason(completed.stderr)})
         return result_text, usage, status
+
+
+def _safe_failure_reason(message: str) -> str:
+    lowered = message.lower()
+    if "pidgin" in lowered and "invalid_grant" in lowered:
+        return "Pidgin OAuth refresh failed: invalid_grant"
+    if "oauth" in lowered:
+        return "MCP OAuth setup failed"
+    return "Codex agent attempt failed; raw diagnostic omitted"
 
 
 def _spend_by_window(
@@ -375,10 +524,18 @@ def _skip_plan(
 
 
 def _usage_total(usage: dict[str, Any] | None) -> int:
-    if not usage:
+    if usage is None:
         return 0
+    if not isinstance(usage, dict):
+        raise FormatError("research usage must be an object")
     fields = ("input_tokens", "output_tokens", "reasoning_output_tokens")
-    return sum(int(usage.get(field, 0) or 0) for field in fields)
+    total = 0
+    for field in fields:
+        value = usage.get(field, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise FormatError(f"research usage {field} must be a nonnegative integer")
+        total += value
+    return total
 
 
 def _validate_research_result(result: Any, plan: dict[str, Any]) -> None:
@@ -440,11 +597,9 @@ def _validate_research_result(result: Any, plan: dict[str, Any]) -> None:
         for field in ("title", "rationale"):
             if not isinstance(proposal[field], str) or not proposal[field].strip():
                 raise FormatError(f"{path}.{field} must be a non-empty string")
-        if proposal["compatibility"] not in {
-            "backwards-compatible",
-            "breaking",
-            "research-only",
-        }:
+        if not isinstance(proposal["compatibility"], str) or proposal[
+            "compatibility"
+        ] not in {"backwards-compatible", "breaking", "research-only"}:
             raise FormatError(f"{path}.compatibility is invalid")
         changes = proposal["changes"]
         if (
@@ -482,12 +637,31 @@ def _validate_string_object(value: Any, fields: set[str], path: str) -> None:
 
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    os.replace(temporary, path)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(
+                json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+            )
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory_handle = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_handle)
+        finally:
+            os.close(directory_handle)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _validate_configuration(

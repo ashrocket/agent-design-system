@@ -1,0 +1,144 @@
+{
+  "$schema": "../src/agent_design_system/schemas/design-system.schema.json",
+  "format": "adsf",
+  "version": "0.1.0",
+  "name": "Aurora example system",
+  "description": "A deliberately small example showing tokens and deterministic enforcement decisions.",
+  "tokens": {
+    "color": {
+      "text": {
+        "primary": {
+          "$type": "color",
+          "$value": "#1e293b",
+          "$description": "Primary text on light surfaces."
+        }
+      },
+      "action": {
+        "primary": {
+          "$type": "color",
+          "$value": "#2563eb",
+          "$description": "Primary interactive action."
+        }
+      },
+      "surface": {
+        "canvas": {
+          "$type": "color",
+          "$value": "#f8fafc",
+          "$description": "Default page surface."
+        }
+      }
+    },
+    "space": {
+      "3": {
+        "$type": "dimension",
+        "$value": 12,
+        "$description": "Compact inset spacing in pixels."
+      },
+      "4": {
+        "$type": "dimension",
+        "$value": 16,
+        "$description": "Default control inset spacing in pixels."
+      }
+    },
+    "radius": {
+      "md": {
+        "$type": "dimension",
+        "$value": 8,
+        "$description": "Default control corner radius in pixels."
+      }
+    }
+  },
+  "rules": [
+    {
+      "id": "exact-large-number",
+      "description": "Normative repair safety behavior.",
+      "rationale": "Independent tools must agree on exact outcomes.",
+      "selector": "$.large",
+      "assert": {
+        "operator": "equals",
+        "value": 9007199254740993
+      },
+      "severity": "error",
+      "decision": [
+        {
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "report"
+          }
+        }
+      ]
+    },
+    {
+      "id": "literal-null",
+      "description": "Normative repair safety behavior.",
+      "rationale": "Independent tools must agree on exact outcomes.",
+      "selector": "$.nullable",
+      "assert": {
+        "operator": "type",
+        "value": "null"
+      },
+      "severity": "error",
+      "decision": [
+        {
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "coerce",
+            "strategy": "replace",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "noop-repair",
+      "description": "Normative repair safety behavior.",
+      "rationale": "Independent tools must agree on exact outcomes.",
+      "selector": "$.noop",
+      "assert": {
+        "operator": "equals",
+        "value": "right"
+      },
+      "severity": "error",
+      "decision": [
+        {
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "coerce",
+            "strategy": "replace",
+            "value": "wrong"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unique-recursive-match",
+      "description": "Normative repair safety behavior.",
+      "rationale": "Independent tools must agree on exact outcomes.",
+      "selector": "$.**.**.selected",
+      "assert": {
+        "operator": "equals",
+        "value": "right"
+      },
+      "severity": "error",
+      "decision": [
+        {
+          "when": {
+            "operator": "always"
+          },
+          "action": {
+            "type": "report"
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "license": "Apache-2.0"
+  }
+}

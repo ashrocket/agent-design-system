@@ -1,0 +1,29 @@
+{
+  "charged_tokens": 9000,
+  "error": "research result missing required property: run_id",
+  "finished_at": "2026-09-24T08:14:54.943148Z",
+  "plan": {
+    "budget_before": {
+      "daily": 0,
+      "monthly": 36000,
+      "weekly": 27000
+    },
+    "budget_limits": {
+      "daily": 12000,
+      "monthly": 280000,
+      "weekly": 70000
+    },
+    "decision": "run",
+    "format": "adsf-research-plan",
+    "planned_at": "2026-09-24T07:51:14.081607Z",
+    "question": "Approach ADSF as an agent implementing a new independent enforcer. Identify missing normative details, unstable assumptions, or fixtures needed to reach byte-for-byte compatible decisions.",
+    "question_id": "tool-builder-audit",
+    "reserved_tokens": 9000,
+    "run_id": "20260924T075114Z-75edba95",
+    "version": "0.1.0"
+  },
+  "raw_result": "{\"error\": \"2026-09-24T08:14:21.741252Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest(\\\"http/request failed: error sending request for url (https://pidginroost.com/mcp)\\\")))\\n\"}",
+  "result": null,
+  "status": "failed",
+  "usage": null
+}

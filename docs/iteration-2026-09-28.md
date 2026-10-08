@@ -1,0 +1,277 @@
+# Assistant design-system enforcement: evening iteration
+
+## Goal and context
+
+Keep LLM coding assistants inside an approved design system while editing actual
+application source. The previous tool enforced supplied component JSON, which
+could pass without inspecting an assistant's CSS. The user requested iterative
+work, thorough validation, and a panel evaluating goals, plan and results.
+They also authorized committing all existing research and tonight's work.
+
+## Constraints and done evidence
+
+Enforcement stays deterministic, offline and dependency-free on Python 3.11+.
+Check preserves inspected files; fix requires an explicit destination or `--write`.
+The research harness remains separate. Preserve existing research attempts and
+their budget charges. A milestone needs real source drift blocked, exact repairs
+rechecked, preserved input bytes, idempotence, adversarial bypass tests, schema
+validation, original conformance, focused static checks and a reviewed diff.
+
+## Panel evaluation of goals and plan
+
+Three independent Codex reviewers examined semantics, safety and the assistant
+workflow. All agreed the primary missing capability was checking actual source.
+They approved a bounded CSS milestone with these requirements:
+
+- Explicit property-specific allowed tokens and variable bindings.
+- Actual source locations and inspected coverage.
+- Rejection of unknown variables, fallbacks, local token shadowing, syntax gaps,
+  shorthand/unknown-property bypasses, and empty coverage.
+- Exact-only, unambiguous repairs followed by fresh enforcement.
+- Assistant context identifying the approved contract and exact gate.
+- Explicit limits: CSS does not establish component reuse or whole-app compliance.
+
+The safety/semantics reviews also reproduced input/output/log alias corruption,
+successful exits for still-invalid repairs, lost null replacements, overlapping
+repair crashes, imprecise integer comparisons, duplicate recursive matches and
+ambiguous token keys. These were corrected with regression and conformance cases.
+The first re-review caught a reject-decision regression and symlink edge cases;
+those were corrected before the enforcement-safety commit.
+
+## Implemented checkpoints
+
+- `f86c259`: existing nightly attempts and conservative budget accounting committed.
+  The records describe failed attempts, not completed research findings.
+- A subsequent 29 September interoperability attempt also failed and charged
+  its 9,000-token reservation. Its recorded raw output reports a Pidgin OAuth
+  refresh `invalid_grant` inside the research agent. This is no research finding.
+- `4c018a3`: enforcement/write safety corrections committed after 54 unit tests,
+  9 normative cases and the example validate/check/fix/recheck flow.
+- The first CSS source gate checks authored declarations against property-specific
+  token references, emits assistant context and a generated token sheet, proposes
+  only exact repairs, and reports source locations and inspected coverage. The
+  CI workflow runs its real-source integration verifier. The latest local pass
+  had 77 unit tests, 9 normative cases, Ruff checks and mypy on Python 3.11;
+  the example validate/check/fix/recheck sequence also passed. No remote CI run
+  is claimed.
+- A panel probe found that excessive nested grouping caused an uncaught
+  `RecursionError`. A depth limit now converts it to a source error, with direct
+  and CLI regressions. Exported assistant examples are checked against actual
+  enforcement; SARIF declares Unicode code-point columns. The source reviewer
+  could inspect relayed parser code but could not run an independent checkout
+  because Codex's shared daemon exhausted its 256-file-handle soft limit.
+
+## Second iteration: whole-project CSS gate
+
+The assistant workflow reviewer independently ran the fixture gate and found a
+passing scan of two CSS files, 15 declarations (11 governed), and one HTML file.
+The reviewer then found two static-HTML bypasses: `<base href>` can rebase a
+relative token stylesheet, and duplicate `href` attributes can make parser and
+browser interpretations diverge. Both now fail with focused regressions. The
+HTML report lists inspected paths, hashes and stylesheet references; legacy
+presentational attributes also fail. Final review found that a second HTML page
+could omit the token sheet while the first satisfied a global reference check;
+the gate now checks token linkage on every page. The reviewer identified a
+handoff gap:
+the exported assistant context still told agents to check one chosen CSS file.
+It now accepts a reviewed project manifest and fingerprint, makes the pinned
+project command the primary handoff gate, and presents single-file checking as
+a diagnostic. Context export refuses a failing gate or different system.
+
+The explicit `adsf-css-project` manifest defines the root, system, generated
+token file and reasoned exclusions. The read-only gate recursively discovers
+CSS, checks token-sheet byte parity, inventories static HTML, flags unsupported
+source formats and inline or external styling surfaces, and records coverage.
+A manifest/system fingerprint must match the reviewed CI pin. Exclusions are
+visible in the report and change the fingerprint. The fixture app demonstrates
+the contract without an application framework. The local verifier mutates a
+temporary copy to prove new CSS drift, stale tokens, inline styles, TSX and
+manifest tampering fail.
+
+The second iteration passed 89 unit tests, nine normative conformance cases,
+Ruff format/lint, mypy on 13 source files, and both CSS integration verifiers
+on local Python 3.11. These are local results; no remote CI run is claimed.
+
+## Remaining research and limits
+
+1. The gate needs adapters for JSX, utility classes, CSS-in-JS, SVG, framework
+   templates (including XHTML) and browser-computed styles before those sources
+   can pass without reviewed exclusions. Component reuse and per-selector
+   semantic intent remain outside this bounded gate.
+2. Independent review and branch protection must pin the manifest, contract and
+   CI workflow; an assistant able to edit all of them could update its own pin.
+3. The local runner now appends and syncs a reservation before invoking Codex;
+   a later settlement replaces it for budget calculations. A simulated
+   interruption leaves the reservation charged, and malformed usage retains
+   the minimum charge. Final safety review found an unhashable compatibility
+   field that could block settlement of known higher usage; this now becomes a
+   recorded invalid result. A result-artifact write failure now still settles
+   known usage. Run IDs are validated before path construction, and result
+   envelopes use a random, exclusive temporary file. The GitHub workflow now
+   pushes a reservation to its state branch before the agent job; remote run
+   behavior remains unverified. Current failed attempts are accounted for,
+   but no valid findings have been produced.
+
+Jev was unavailable in this session (no exposed tool or API credential), so the
+panel used direct code evidence. The MacBook worker readiness snapshot reported
+offline; these validation results were local, not worker results.
+
+The file-handle diagnosis points to the shared Codex app-server daemon, not the
+repository tests. It held 249-254 numbered descriptors near a 256 soft limit,
+including many connector pipes, session files and database handles. This
+establishes process-local pressure but not whether retained idle sessions or a
+daemon leak is the root cause. No peer session was terminated.
+
+The local checkpoint after the panel fixes passed 98 unit tests, nine
+normative cases, both source-workflow verifiers, Ruff, mypy and `actionlint` for
+the revised nightly workflow. No GitHub run or deployment is claimed.
+
+## Third iteration: account for every project file
+
+The source gate previously recognized a fixed list of unsupported suffixes.
+An assistant could add a new file with an unfamiliar extension, or an
+extensionless file, and leave the project check green. The workflow and safety
+reviewers agreed that every non-excluded regular file needs a recorded outcome.
+
+The gate now inspects CSS and static HTML, trusts the manifest, system and
+generated token sheet only at their exact declared paths, and reports every
+other regular file as `adapter-required`. The report includes each unsupported
+file's path, suffix, size and SHA-256 when it is at most 64 MiB. Larger files
+retain an explicit `size-limit` hash status and still fail. CSS and HTML above
+8 MiB, scans deeper than 64 directories, and scans beyond 20,000 entries also
+fail closed. A fixture mutation proves an unfamiliar suffix fails; unit cases
+cover JSON, media, extensionless files, trusted exact paths and the limits.
+
+This makes coverage gaps visible but does not inspect their design content.
+Reviewed exclusions remain holes: their contents are neither scanned nor
+included in the contract fingerprint. A narrow root, independently reviewed
+exclusions and policy pins are still required. The next useful adapter should
+inspect a real application source format such as TSX with a parser, rather
+than trying to infer it from suffixes or string matching. No whole-app or
+browser-computed-style compliance is claimed from this checkpoint.
+
+## Fourth iteration: connect markup classes to inspected CSS
+
+The panel found that an adapter accepting `className` by string alone would be
+misleading: the class might appear only in a comment, a negative selector, a
+conditional rule, or an unrelated stylesheet. The existing static HTML gate
+also had this gap. CSS enforcement now indexes only nonempty, simple top-level
+class rules from parsed rule preludes. Each HTML page checks its static `class`
+tokens against that page's directly linked, inspected CSS. Conditional or
+alternate stylesheet links cannot establish that connection. The passing
+fixture's three classes have matching base rules; an unknown utility class or
+an otherwise valid rule in an unlinked stylesheet fails.
+
+This index is a prerequisite for a parser-backed TSX adapter. The panel found
+that a useful TSX PASS also needs a closed import graph, a validated application
+entrypoint and a restrictive syntax profile; the current HTML gate rejects
+module scripts. Static class linkage therefore does not yet establish React
+application coverage. Even for HTML, it proves a declared connection, not that
+the browser loaded a stylesheet or applied the rule at runtime.
+An independent source review moved the token link into `<template>` and
+`<noscript>` and reproduced a false pass. Both inert or conditional containers
+now reject, with regressions, so their links cannot certify a page.
+The same reviewer found that an empty class rule could count as a base rule;
+the index now requires a declaration in that rule. Independent rechecks found
+no remaining concrete false pass within the stated static CSS/HTML profile.
+The final local checkpoint passed 105 unit tests, nine normative cases, both
+source-workflow verifiers, Ruff, mypy, and the required example
+validate/check/fix/recheck sequence. The invalid example exits nonzero before
+repair and retains only its accessibility warning after repair. No remote CI
+run or browser-rendered result is claimed.
+
+## Fifth iteration: parser-backed static TSX source
+
+The panel evaluated an opt-in TSX plan and rejected a class-name-only AST walk
+as unsound. An otherwise static JSX return could hide style changes in function
+statements, default parameters, imports, JSX spreads, executable attributes or
+style-capable elements. The chosen source profile therefore permits only local
+CSS imports and one parameterless default-exported function returning a static
+tree of reviewed intrinsic tags and literal attributes. Parser errors and every
+unknown AST form fail. Python resolves each import to inspected CSS, requires
+the generated token sheet and checks classes against the conservative base-rule
+index. The TypeScript 6.0.3 sidecar is lockfile-pinned and only parses supplied
+source; the core package has no mandatory Node dependency.
+
+The local integration verifier constructs a temporary opt-in project, checks a
+passing component, then mutates imports, classes, tags, attributes, expressions
+and executable statements to require nonzero exits. It also verifies missing
+Node fails closed and passing source bytes remain unchanged. This is a static
+component-source adapter. The HTML gate still rejects module scripts, and a
+React entrypoint, transitive component graph, built bundle and browser behavior
+are not yet certified.
+
+Independent panel review found three ways the first TSX version could give a
+misleading pass: a bare `@jsx` factory pragma, an `amd-dependency` triple-slash
+directive, and a spoofed `node` earlier on `PATH`. The parser now rejects all
+triple-slash directives and JSX compiler pragmas. The runner uses only an
+explicit trusted absolute `ADSF_NODE_BIN`. The panel also found that reporting
+sidecar and lock hashes did not pin them; the manifest now requires reviewed
+hashes, checked before launch, and the integration verifier fixes those values
+and the contract fingerprint independently. Installed TypeScript package and
+entrypoint bytes are checked against reviewed hashes after `npm ci`. Adversarial
+tests cover these corrections. The panel re-reviewed the narrow source profile
+and found no remaining concrete false pass within it.
+
+This remains a source-checkout opt-in: a built wheel contains the sidecar and
+lock but not `node_modules`, and the documented `npm ci` command targets the
+checkout. The local checks do not establish a React app or rendered design.
+
+## Sixth iteration: source to rendered React fixture
+
+The panel chose a constrained browser proof before calling any React app
+compliant. It rejected a bare bundle-hash pass because the bundle could omit
+inspected CSS or differ from what the browser loads. The fixture now gates a
+static `App.tsx` and its three CSS imports, compares a copied build snapshot to
+the source gate's per-file hashes, and runs a fixed React bootstrap through a
+fresh locked esbuild installation. The build report must contain only that
+source graph, the fixed bootstrap, and locked React runtime modules. The exact
+three output assets must match a second build from a different source path.
+Deliberate source-byte drift, changed built CSS, and an extra output asset are
+required to fail verification.
+
+Chromium loads the attested HTML, JavaScript, and stylesheet from a local
+three-path server. The browser check requires one visible mounted button, the
+approved token and computed background, no page errors, and no unknown or
+external requests. A response-only red CSS override must cause the normal
+approved-color assertion to reject that browser observation, while the source
+and on-disk output hashes stay fixed. This probes one rendered property, not
+all possible styles or interactions.
+
+The independent panel found and the implementation addressed two early gaps:
+the copied source was initially not hash-bound to the source report, and Node
+and npm were initially selected from a mutable `PATH`. The final verifier
+requires explicit absolute executable paths and compares every copied file to
+the gate report. It also builds from a second source location to test local
+path independence. The panel judged the remaining scope honest only as a
+rendered **static component fixture**: the HTML shell and React mount are
+tool-owned constants, not an inspected app entry. A remote CI run is still
+unverified until GitHub reports one. The next product test is a protected pilot
+app where an assistant's forbidden style edit fails CI and an approved edit
+passes without allowing the assistant to revise the policy or verifier.
+
+### Authored-entry extension, 29 September
+
+The next fixture revision moves `index.html` and `main.tsx` into the app source
+root. The optional `pinned-react-entry-v1` profile requires exact host and entry
+hashes in the manifest; neither may be excluded. The project gate inventories
+them separately from the statically inspected `App.tsx` and CSS. The pinned
+builder consumes the authored `main.tsx`, copies the checked host bytes, and
+must show all five bundled source inputs in its metafile; the host is checked
+separately. The trusted Python verifier writes artifact hashes to a fresh
+external attestation, which
+the browser verifier checks before serving exactly three assets.
+The panel found that the standalone project gate could otherwise accept
+updated host/entry pins in a changed manifest. It now requires an external
+expected contract fingerprint whenever the app profile is enabled. Browser
+provenance still depends on the protected verifier-to-attestation handoff.
+
+Focused negative tests rejected host and entry tampering, excluded pinned
+sources, changed manifest pins under the external contract fingerprint, and an
+extra source file. A controlled compliant edit changed button text to “Review
+now” and padding from the approved `--space-3` to `--space-4` token. The source
+gate, two path-independent builds, artifact attestation, and Chromium all
+passed; Chromium observed 16px padding and the new text. A response-only red
+override still failed the approved-style assertion. The profile remains fixed
+to one static app shape. It has not yet measured a blind assistant edit or a
+remote exact-SHA CI run.

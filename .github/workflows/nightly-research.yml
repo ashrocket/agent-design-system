@@ -19,6 +19,8 @@ jobs:
   plan:
     if: github.event_name == 'workflow_dispatch' || vars.ADSF_ENABLE_GITHUB_SCHEDULE == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       should_run: ${{ steps.plan.outputs.should_run }}
       run_id: ${{ steps.plan.outputs.run_id }}
@@ -26,14 +28,19 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Restore public budget ledger
+      - name: Restore public budget state
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git fetch origin "$STATE_BRANCH:refs/remotes/origin/$STATE_BRANCH"; then
-            git show "refs/remotes/origin/$STATE_BRANCH:research/ledger.jsonl" > research/ledger.jsonl || true
+            git switch --create "$STATE_BRANCH" --track "refs/remotes/origin/$STATE_BRANCH"
+            git merge --no-edit "$GITHUB_SHA"
+          else
+            git switch --create "$STATE_BRANCH"
           fi
       - name: Apply budget gates and choose a question
         id: plan
@@ -47,17 +54,27 @@ jobs:
       - name: Stage schema for the agent
         if: steps.plan.outputs.should_run == 'true'
         run: cp src/agent_design_system/schemas/research-result.schema.json .research/result.schema.json
+      - name: Persist reservation before agent starts
+        if: steps.plan.outputs.should_run == 'true'
+        run: |
+          python -m agent_design_system research reserve --plan .research/plan.json
+          git add research/ledger.jsonl
+          git commit -m "research: reserve ${{ steps.plan.outputs.run_id }}"
+          git push origin "$STATE_BRANCH"
+        env:
+          PYTHONPATH: src
       - uses: actions/upload-artifact@v4
         if: steps.plan.outputs.should_run == 'true'
         with:
           name: research-plan-${{ steps.plan.outputs.run_id }}
           path: .research/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
   research:
     needs: plan
-    if: needs.plan.outputs.should_run == 'true'
+    if: needs.plan.result == 'success' && needs.plan.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -87,7 +104,7 @@ jobs:
 
   publish:
     needs: [plan, research]
-    if: always() && needs.plan.outputs.should_run == 'true'
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -103,6 +120,8 @@ jobs:
           persist-credentials: true
       - name: Restore or create the public state branch
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git fetch origin "$STATE_BRANCH:refs/remotes/origin/$STATE_BRANCH"; then
             git switch --create "$STATE_BRANCH" --track "refs/remotes/origin/$STATE_BRANCH"
             git merge --no-edit "$GITHUB_SHA"
@@ -126,8 +145,6 @@ jobs:
           PYTHONPATH: src
       - name: Publish auditable state
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add research/ledger.jsonl research/results/
           if git diff --cached --quiet; then
             echo "Run was already recorded; nothing to commit."

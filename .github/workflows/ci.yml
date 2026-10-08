@@ -20,14 +20,27 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
       - name: Install package
         run: python -m pip install -e ".[dev]"
+      - name: Install trusted pilot CLI
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --no-deps -e .
+      - name: Install optional static TSX parser
+        run: npm ci --prefix src/agent_design_system/adapters/tsx --ignore-scripts --no-audit --no-fund
+      - name: Select trusted Node binary for the optional parser
+        run: |
+          echo "ADSF_NODE_BIN=$(realpath "$(command -v node)")" >> "$GITHUB_ENV"
+          echo "ADSF_NPM_CLI=$(realpath "$(command -v npm)")" >> "$GITHUB_ENV"
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Check formatting
-        run: ruff format --check src tests
+        run: ruff format --check src tests scripts
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src tests scripts
       - name: Type-check
         run: mypy src/agent_design_system
       - name: Validate example system
@@ -36,6 +49,23 @@ jobs:
         run: adsys check examples/aurora.design-system.json examples/button.valid.json
       - name: Run normative conformance suite
         run: adsys conformance
+      - name: Verify assistant CSS source workflow
+        run: python scripts/verify-css-workflow.py
+      - name: Verify pinned project-wide CSS gate
+        run: python scripts/verify-project-workflow.py
+      - name: Verify static TSX source profile
+        run: python scripts/verify-tsx-workflow.py
+      - name: Install rendered React fixture tools
+        if: matrix.python-version == '3.11'
+        run: npm ci --prefix scripts/react-fixture --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium for rendered fixture
+        if: matrix.python-version == '3.11'
+        run: node scripts/react-fixture/node_modules/playwright-core/cli.js install --with-deps chromium
+      - name: Verify source-to-browser React fixture
+        if: matrix.python-version == '3.11'
+        run: |
+          python scripts/verify-rendered-react-workflow.py --output "$RUNNER_TEMP/adsf-react-fixture" --attestation "$RUNNER_TEMP/adsf-react-attestation.json"
+          node scripts/react-fixture/browser-verify.cjs "$RUNNER_TEMP/adsf-react-fixture" "$RUNNER_TEMP/adsf-react-attestation.json"
       - name: Verify failing example fails
         run: |
           if adsys check examples/aurora.design-system.json examples/button.invalid.json; then

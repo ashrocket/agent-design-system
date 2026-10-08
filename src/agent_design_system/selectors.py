@@ -36,10 +36,13 @@ def _path_string(segments: tuple[str | int, ...]) -> str:
 def select(document: Any, selector: str) -> list[Match]:
     pattern = parse_selector(selector)
     matches: list[Match] = []
+    seen: set[tuple[str | int, ...]] = set()
 
     def walk(value: Any, index: int, path: tuple[str | int, ...]) -> None:
         if index == len(pattern):
-            matches.append(Match(_path_string(path), path, value))
+            if path not in seen:
+                seen.add(path)
+                matches.append(Match(_path_string(path), path, value))
             return
 
         segment = pattern[index]

@@ -1,0 +1,12 @@
+.stage {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background-color: var(--color-surface-canvas);
+  color: var(--color-text-primary);
+}
+
+.card {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}

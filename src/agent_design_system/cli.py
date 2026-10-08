@@ -3,15 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from . import __version__
 from .conformance import run_suite
+from .css import agent_context, enforce_css, render_context, render_tokens
 from .enforce import enforce
 from .format import FormatError, load_json, validate_design_system
+from .project import check_project
 from .reporters import SEVERITY_LEVEL, render, should_fail
 from .research import (
     build_prompt,
@@ -20,10 +24,13 @@ from .research import (
     make_plan,
     parse_time,
     record_run,
+    reserve_run,
+    reserve_run_checked,
     run_codex,
     status_report,
 )
 from .scheduler import render_macos_launch_agent, write_macos_launch_agent
+from .tailwind import audit_tailwind
 
 DEFAULT_CONFORMANCE_MANIFEST = (
     Path(__file__).resolve().parent / "conformance_suite" / "manifest.json"
@@ -46,13 +53,13 @@ def build_parser() -> argparse.ArgumentParser:
     validate.set_defaults(handler=_validate)
 
     check = commands.add_parser(
-        "check", help="check a JSON document without changing it"
+        "check", help="check JSON or CSS source without changing it"
     )
     _add_enforcement_arguments(check)
     check.set_defaults(handler=_check)
 
     fix = commands.add_parser(
-        "fix", help="apply decision-tree coercions to a JSON document"
+        "fix", help="apply approved repairs to JSON or CSS source"
     )
     _add_enforcement_arguments(fix)
     destination = fix.add_mutually_exclusive_group(required=True)
@@ -63,6 +70,50 @@ def build_parser() -> argparse.ArgumentParser:
         "--write", action="store_true", help="replace the input document"
     )
     fix.set_defaults(handler=_fix)
+
+    context = commands.add_parser(
+        "context", help="export the approved CSS contract for a coding assistant"
+    )
+    context.add_argument("system")
+    context.add_argument(
+        "--project-manifest", help="reviewed project manifest for the primary gate"
+    )
+    context.add_argument(
+        "--expected-sha256",
+        help="required reviewed fingerprint with --project-manifest",
+    )
+    context.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    context.add_argument("--output", help="write a file instead of stdout")
+    context.set_defaults(handler=_context)
+
+    tokens = commands.add_parser(
+        "tokens", help="generate the contract's CSS custom-property stylesheet"
+    )
+    tokens.add_argument("system")
+    tokens.add_argument("--output", help="write a file instead of stdout")
+    tokens.set_defaults(handler=_tokens)
+
+    project_check = commands.add_parser(
+        "project-check", help="check non-excluded CSS under a reviewed project root"
+    )
+    project_check.add_argument("manifest", help="reviewed CSS project manifest")
+    project_check.add_argument(
+        "--expected-sha256", help="reviewed system and manifest fingerprint"
+    )
+    project_check.add_argument("--format", choices=("text", "json"), default="text")
+    project_check.set_defaults(handler=_project_check)
+
+    tailwind = commands.add_parser(
+        "tailwind-audit", help="advisory audit of Tailwind colors in TSX and @theme"
+    )
+    tailwind.add_argument("--tsx-root", required=True)
+    tailwind.add_argument("--theme-css", required=True)
+    tailwind.add_argument("--canon", required=True)
+    tailwind.add_argument("--canon-path", default="swatches.web.hexes")
+    tailwind.add_argument("--exclude", action="append", default=[])
+    tailwind.add_argument("--format", choices=("text", "json"), default="text")
+    tailwind.add_argument("--fail-on-findings", action="store_true")
+    tailwind.set_defaults(handler=_tailwind_audit)
 
     conformance = commands.add_parser(
         "conformance", help="run language-neutral ADSF conformance vectors"
@@ -101,6 +152,15 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--ledger", default="research/ledger.jsonl")
     status.add_argument("--at", help="ISO-8601 report time; defaults to now")
     status.set_defaults(handler=_research_status)
+
+    reserve = research_commands.add_parser(
+        "reserve", help="durably charge a planned run before starting an agent"
+    )
+    reserve.add_argument("--plan", required=True)
+    reserve.add_argument("--ledger", default="research/ledger.jsonl")
+    reserve.add_argument("--budget", default="research/budget.json")
+    reserve.add_argument("--questions", default="research/questions.json")
+    reserve.set_defaults(handler=_research_reserve)
 
     record = research_commands.add_parser(
         "record", help="record an attempted research run"
@@ -159,7 +219,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _add_enforcement_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("system", help="ADSF design-system JSON")
-    parser.add_argument("document", help="JSON document to inspect")
+    parser.add_argument("document", help="JSON document or CSS source to inspect")
+    parser.add_argument(
+        "--input-format",
+        choices=("json", "css"),
+        default="json",
+        help="inspect a JSON document or authored CSS source",
+    )
     parser.add_argument("--format", choices=("text", "json", "sarif"), default="text")
     parser.add_argument("--fail-on", choices=tuple(SEVERITY_LEVEL), default="error")
     parser.add_argument("--log", help="append each violation as JSON Lines")
@@ -182,7 +248,32 @@ def _validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _tailwind_audit(args: argparse.Namespace) -> int:
+    report = audit_tailwind(
+        tsx_root=args.tsx_root,
+        theme_css=args.theme_css,
+        canon=args.canon,
+        canon_path=args.canon_path,
+        excludes=tuple(args.exclude),
+    )
+    if args.format == "json":
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        coverage = report["coverage"]
+        print(
+            f"TSX files: {coverage['tsx_files']}; class attributes: "
+            f"{coverage['jsx_class_attributes']}; dynamic: "
+            f"{coverage['dynamic_class_attributes']}; findings: "
+            f"{sum(report['finding_counts'].values())}"
+        )
+        for code, count in report["finding_counts"].items():
+            print(f"{code}: {count}")
+        print(f"Coverage limit: {coverage['uninspected']}")
+    return 1 if args.fail_on_findings and report["finding_counts"] else 0
+
+
 def _check(args: argparse.Namespace) -> int:
+    _guard_enforcement_paths(args, fixing=False)
     result = _enforcement_result(args, apply_fixes=False)
     print(render(result, args.format))
     _append_log(args.log, result.to_dict()["violations"], args.document)
@@ -190,26 +281,68 @@ def _check(args: argparse.Namespace) -> int:
 
 
 def _fix(args: argparse.Namespace) -> int:
+    _guard_enforcement_paths(args, fixing=True)
     result = _enforcement_result(args, apply_fixes=True)
     destination = Path(args.document if args.write else args.output)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps(result.document, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    system = load_json(args.system)
+    if args.input_format == "css":
+        final = enforce_css(system, result.document, source=str(destination))
+        content = result.document
+    else:
+        final = enforce(system, result.document, source=str(destination))
+        content = json.dumps(result.document, indent=2, ensure_ascii=False) + "\n"
+    _atomic_write(destination, content)
     print(render(result, args.format))
     print(f"WROTE {destination}", file=sys.stderr)
     _append_log(args.log, result.to_dict()["violations"], args.document)
-    unresolved = [
-        violation
-        for violation in result.violations
-        if violation.disposition not in {"coerce", "ignore"}
-        and (
-            violation.disposition == "reject"
-            or SEVERITY_LEVEL[violation.severity] >= SEVERITY_LEVEL[args.fail_on]
+    rejected = any(violation.disposition == "reject" for violation in result.violations)
+    return 1 if rejected or should_fail(final, args.fail_on) else 0
+
+
+def _same_path(left: str | Path, right: str | Path) -> bool:
+    a, b = Path(left), Path(right)
+    try:
+        return a.resolve() == b.resolve() or (
+            a.exists() and b.exists() and a.samefile(b)
         )
-    ]
-    return 1 if unresolved else 0
+    except RuntimeError as error:
+        raise FormatError(f"invalid path: {error}") from error
+
+
+def _guard_enforcement_paths(args: argparse.Namespace, *, fixing: bool) -> None:
+    protected = [args.system, args.document]
+    if fixing:
+        if args.write and Path(args.document).is_symlink():
+            raise FormatError("--write requires a direct input path, not a symlink")
+        destination = args.document if args.write else args.output
+        if Path(destination).is_symlink():
+            raise FormatError("output requires a direct path, not a symlink")
+        if _same_path(destination, args.system):
+            raise FormatError("output must not overwrite the design system")
+        if not args.write and _same_path(destination, args.document):
+            raise FormatError(
+                "output aliases the input; use --write for an in-place edit"
+            )
+        protected.append(destination)
+    if args.log and any(_same_path(args.log, path) for path in protected):
+        raise FormatError("log must not alias the design system, input, or output")
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, delete=False
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+        if path.exists():
+            temporary.chmod(path.stat().st_mode & 0o777)
+        temporary.replace(path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
 
 def _conformance(args: argparse.Namespace) -> int:
@@ -229,8 +362,88 @@ def _conformance(args: argparse.Namespace) -> int:
 
 def _enforcement_result(args: argparse.Namespace, *, apply_fixes: bool):
     system = load_json(args.system)
+    if args.input_format == "css":
+        with Path(args.document).open(encoding="utf-8", newline="") as handle:
+            return enforce_css(
+                system, handle.read(), source=args.document, apply_fixes=apply_fixes
+            )
     document = load_json(args.document)
     return enforce(system, document, source=args.document, apply_fixes=apply_fixes)
+
+
+def _export(args: argparse.Namespace, content: str) -> int:
+    if args.output:
+        if _same_path(args.output, args.system):
+            raise FormatError("export must not overwrite the design system")
+        _atomic_write(Path(args.output), content)
+    else:
+        print(content, end="")
+    return 0
+
+
+def _context(args: argparse.Namespace) -> int:
+    system = load_json(args.system)
+    project_gate = None
+    if bool(args.project_manifest) != bool(args.expected_sha256):
+        raise FormatError(
+            "project context requires both --project-manifest and --expected-sha256"
+        )
+    if args.project_manifest:
+        report = check_project(
+            args.project_manifest, expected_sha256=args.expected_sha256
+        )
+        if report["status"] != "pass":
+            raise FormatError("project gate must pass before exporting its context")
+        manifest = load_json(args.project_manifest)
+        declared_system = (
+            Path(args.project_manifest).absolute().parent / manifest["system"]
+        )
+        if system != load_json(declared_system):
+            raise FormatError(
+                "context system differs from the project's declared system"
+            )
+        project_gate = (
+            f"adsys project-check {shlex.quote(args.project_manifest)} "
+            f"--expected-sha256 {args.expected_sha256}"
+        )
+    content = (
+        json.dumps(
+            agent_context(system, args.system, project_gate=project_gate),
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        + "\n"
+        if args.format == "json"
+        else render_context(system, args.system, project_gate=project_gate)
+    )
+    return _export(args, content)
+
+
+def _tokens(args: argparse.Namespace) -> int:
+    return _export(args, render_tokens(load_json(args.system)))
+
+
+def _project_check(args: argparse.Namespace) -> int:
+    report = check_project(args.manifest, expected_sha256=args.expected_sha256)
+    if args.format == "json":
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        coverage = report["coverage"]
+        print(
+            f"{report['status'].upper()} project CSS: {coverage['css_files']} file(s), "
+            f"{coverage['css_declarations']} declaration(s), "
+            f"{coverage['governed_declarations']} governed; "
+            f"{len(report['issues'])} issue(s); contract {report['contract_sha256']}"
+        )
+        for issue in report["issues"]:
+            print(f"  {issue['path']}: {issue['code']}: {issue['message']}")
+        for exclusion in coverage["exclusions"]:
+            print(
+                f"  UNINSPECTED {exclusion['path']}: {exclusion['reason']} "
+                f"({'present' if exclusion['present'] else 'unused'})"
+            )
+    return 0 if report["status"] == "pass" else 1
 
 
 def _append_log(
@@ -277,6 +490,18 @@ def _research_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _research_reserve(args: argparse.Namespace) -> int:
+    entry = reserve_run_checked(
+        load_json(args.plan),
+        args.ledger,
+        load_json(args.budget),
+        load_json(args.questions),
+        now=datetime.now(UTC),
+    )
+    print(json.dumps(entry, indent=2, sort_keys=True))
+    return 0
+
+
 def _research_record(args: argparse.Namespace) -> int:
     plan = load_json(args.plan)
     result_text = ""
@@ -285,14 +510,15 @@ def _research_record(args: argparse.Namespace) -> int:
     elif args.result_env:
         result_text = os.environ.get(args.result_env, "")
     usage = load_json(args.usage) if args.usage else None
-    entry = record_run(
-        plan,
-        result_text,
-        status=args.status,
-        ledger_path=args.ledger,
-        results_dir=args.results_dir,
-        usage=usage,
-    )
+    with ledger_lock(args.ledger):
+        entry = record_run(
+            plan,
+            result_text,
+            status=args.status,
+            ledger_path=args.ledger,
+            results_dir=args.results_dir,
+            usage=usage,
+        )
     print(json.dumps(entry, indent=2, sort_keys=True))
     return 0
 
@@ -314,6 +540,7 @@ def _research_run_locked(args: argparse.Namespace) -> int:
         print("\n--- PROMPT ---\n")
         print(build_prompt(plan))
         return 0
+    reserve_run(plan, args.ledger)
     result_text, usage, status = run_codex(
         plan,
         repository=args.repository,

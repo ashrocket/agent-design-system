@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Keeping coding assistants inside the design system — ADSF research brief</title>
+  <style>
+    :root { --ink:#17263a; --muted:#51627a; --blue:#2563eb; --soft:#edf4ff; --line:#d8e2ef; --red:#d62b45; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(135deg,#e6effa 0%,#f4f7fb 46%,#e9eef7 100%); color:var(--ink); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:930px; margin:36px auto; background:#fff; box-shadow:0 22px 70px #2139561c; border:1px solid var(--line); border-radius:22px; overflow:hidden; }
+    header { padding:46px 56px 42px; background:linear-gradient(138deg,#10243e 0%,#193d72 65%,#1d55a4 100%); color:#fff; }
+    .eyebrow { margin:0 0 18px; color:#a9ceff; text-transform:uppercase; font-weight:800; font-size:12px; letter-spacing:.16em; }
+    h1 { max-width:700px; margin:0; font:700 clamp(2.4rem,6vw,4rem)/1.05 Georgia,"Times New Roman",serif; letter-spacing:-.045em; }
+    .lede { max-width:710px; margin:20px 0 0; color:#e2edff; font-size:1.15rem; line-height:1.5; }
+    .pill { display:inline-block; margin-top:24px; padding:7px 12px; border-radius:999px; border:1px solid #a7c8fa88; background:#ffffff1b; font-size:12px; font-weight:750; letter-spacing:.02em; }
+    .body { padding:36px 56px 40px; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 32px; }
+    .metric { padding:19px; border:1px solid var(--line); border-radius:14px; background:#f8fbff; min-height:112px; }
+    .metric strong { display:block; color:#174ea6; font:700 2rem/1.1 Georgia,serif; }
+    .metric span { display:block; margin-top:7px; color:var(--muted); font-size:13px; line-height:1.35; }
+    section { border-top:1px solid var(--line); padding-top:24px; margin-top:24px; }
+    h2 { margin:0 0 11px; font:700 1.43rem/1.2 Georgia,serif; letter-spacing:-.015em; }
+    p { margin:0 0 13px; } p:last-child { margin-bottom:0; }
+    .callout { padding:17px 20px; margin:18px 0; border-left:4px solid var(--blue); border-radius:0 11px 11px 0; background:var(--soft); font-weight:650; }
+    .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:17px 0; font-size:13px; font-weight:750; color:#2656a4; }
+    .flow span { padding:8px 11px; background:#f2f7ff; border:1px solid #cadbfa; border-radius:9px; }
+    .flow b { color:#95a8c3; }
+    .proof { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:17px 0; }
+    .state { padding:18px; border-radius:13px; border:1px solid var(--line); background:#fbfdff; }
+    .state em { display:block; font-size:12px; font-style:normal; color:var(--muted); font-weight:750; text-transform:uppercase; letter-spacing:.08em; }
+    .state strong { display:block; margin-top:9px; font:700 1.15rem/1.2 Georgia,serif; }
+    .kicker { margin:18px 0 4px; color:#164da3; font-size:12px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
+    .sample { display:flex; align-items:center; gap:11px; margin-top:12px; font-size:13px; color:#354a66; }
+    .swatch { width:30px; height:30px; border-radius:9px; box-shadow:0 2px 6px #152b4225; }
+    .blue { background:var(--blue); } .red { background:var(--red); }
+    code { padding:1px 4px; border-radius:4px; background:#eef3f9; font:.87em/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    a { color:#164da3; text-decoration-thickness:1px; text-underline-offset:2px; }
+    footer { margin-top:27px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media(max-width:680px) { body{background:#fff;} main{margin:0;border:0;border-radius:0;box-shadow:none;} header{padding:33px 23px;} .body{padding:27px 23px 35px;} .metrics,.proof{grid-template-columns:1fr;} .metric{min-height:0;} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Agent Design System / research brief / 30 September 2026</p>
+    <h1>Keep the assistant inside the system</h1>
+    <p class="lede">Coding assistants can read a design system and still drift from it. Our research turns the system into a contract that independent tools can enforce, then follows one authored React page from source to browser pixels.</p>
+    <span class="pill">30 September checkpoint · local chain passed · assistant trial budget-gated</span>
+  </header>
+  <div class="body">
+    <div class="metrics" aria-label="Verified local results">
+      <div class="metric"><strong>133</strong><span>unit tests passed locally</span></div>
+      <div class="metric"><strong>6</strong><span>app source files accounted for</span></div>
+      <div class="metric"><strong>3</strong><span>attested assets loaded in Chromium</span></div>
+    </div>
+    <section>
+      <h2>The research finding</h2>
+      <p class="callout">A prompt is useful guidance; the enforceable boundary is a reviewed contract checked outside the assistant’s writable scope. The check itself is deterministic and has no runtime model or network dependency.</p>
+      <p>The open, vendor-neutral format records tokens and rule decisions as <code>report</code>, <code>coerce</code>, <code>reject</code>, or <code>ignore</code>. <code>adsys check</code> reports without changing source; <code>adsys fix</code> writes only to an explicit output unless asked to write in place. A separate, budgeted research loop can suggest improvements without sitting in the enforcement path.</p>
+    </section>
+    <section>
+      <h2>What we built and tested</h2>
+      <div class="flow" aria-label="Verification chain"><span>Reviewed contract</span><b>→</b><span>Source gate</span><b>→</b><span>Locked build</span><b>→</b><span>Attestation</span><b>→</b><span>Chromium</span></div>
+      <p>The project gate inventories every file under the app root, checks generated token parity, rejects unknown source, and links static JSX classes to inspected CSS. The React host <code>index.html</code> and mount entry <code>main.tsx</code> are app-authored, exact-pinned files. The external expected contract fingerprint is mandatory for this profile, so changing manifest pins alongside code cannot create a standalone pass.</p>
+      <p>The trusted builder consumes that entry, copies the checked host, and permits five bundled source inputs plus the separately checked HTML. Two independent source locations produced the same three output bytes. The verifier then issues a fresh artifact attestation outside the app output directory.</p>
+    </section>
+    <section>
+      <h2>Where the rule held</h2>
+      <p>Chromium mounted one visible button, loaded the attested stylesheet, kept the approved token <code>#2563eb</code>, and computed the button background as <code>rgb(37, 99, 235)</code>. It requested only the expected HTML, JavaScript, and CSS.</p>
+      <div class="proof" aria-label="Browser mutation experiment">
+        <div class="state"><em>Approved edit</em><strong>“Review now” · 16px padding</strong><div class="sample"><span class="swatch blue" aria-hidden="true"></span><span>Changed JS and CSS, verified in Chromium</span></div></div>
+        <div class="state"><em>Forbidden drift</em><strong>Literal red background</strong><div class="sample"><span class="swatch red" aria-hidden="true"></span><span>Source gate rejected the edit</span></div></div>
+      </div>
+      <p>The compliant edit used the approved <code>--space-4</code> token; Chromium asserted its new text, 16px top and bottom padding, and unchanged foreground/background colors. The unchanged baseline failed that exact edit assertion. A forbidden <code>#ff0000</code> source edit failed the CSS rule before build. Separate negative checks rejected host and entry tampering, excluded pinned files, changed manifest pins, extra source, changed built CSS, and an extra emitted asset. A response-only red override also failed the normal browser color assertion.</p>
+      <p>A new adversarial check found a visible false pass: <code>::after { content: " SALE"; }</code> made the button read “Review SALE” in a screenshot while source, build, and browser checks passed. The Aurora contract now rejects that authored CSS as <code>css-content</code>. Chromium also checks generated pseudo-element copy and rejects the same text when injected into a CSS response. This closes that specific drift path in the fixed fixture.</p>
+    </section>
+    <section>
+      <h2>The honest boundary</h2>
+      <p>This is one <strong>fixed static React app profile</strong>, not arbitrary app coverage. The host and entry are reviewed byte-for-byte rather than semantically parsed. The browser asserts the button’s foreground and background, plus exact text and vertical padding in the controlled edit mode. Routes, interactions, dynamic component graphs, server behavior, and full visual fidelity still need coverage.</p>
+      <p>The browser command accepts an unsigned attestation, so its source provenance depends on the trusted Python verifier-to-browser handoff. CI is wired but has not been observed remotely at an exact commit. A blind assistant run is still unmeasured; the approved edit was a controlled local experiment.</p>
+      <p class="kicker">Next decisive experiment</p>
+      <p>The pilot runner prepares a disposable Git-backed copy, gives the assistant context that points to that copy, reserves the shared budget before launching Codex, and evaluates the source patch, then the build and browser when the source gate passes. Panel review tightened its inherited environment, executable selection, protected artifact paths, usage settlement, and result labels. The tests distinguish a red declaration caught by the gate from a harmless comment, and leave a no-edit assistant response pending human review. The real staged copy passed the source gate.</p>
+      <p>The pilot command now disables four known Codex feature surfaces: plugins, apps, browser use, and hooks. Its JSONL audit rejects incomplete streams and unknown tool items; a conclusive edited result must also show a command or file-change event. A local configured-server listing still showed enabled Pidgin and 1Password entries, and the plugin listing showed enabled plugins. Those listings cannot establish the effective tools inside <code>codex exec --ignore-user-config</code>; post-run events also cannot prove what was offered. The exact runtime tool and writable-root boundary remains unverified.</p>
+      <p>The shared ledger has already used its one run for 30 September, so the runner returned <code>skip</code> without starting an assistant. A future controlled assistant run and a protected base-ref CI run are necessary before claiming this boundary holds in a normal assistant-edited PR.</p>
+    </section>
+    <section>
+      <h2>Next steps</h2>
+      <p><strong>First, prove the pilot boundary.</strong> Inspect the effective tools and writable roots for the exact Codex run, or use a controlled runner with known tool access. Keep trusted policy and result paths outside the assistant’s writable area.</p>
+      <p><strong>Then run two blind edits on separate budgeted UTC days.</strong> Test the approved label-and-padding change, followed by the forbidden literal-red request. Preserve each prompt, event stream, and source patch privately; panel-review assistant behavior separately from the independent source, build, and browser outcomes.</p>
+      <p><strong>Finally, verify the normal PR path.</strong> With explicit push authorization, require protected base-ref CI at the assistant patch’s exact SHA. Extend beyond this fixed fixture using a reviewed Retailaer contract for assets, fonts, web color roles, geometry, and visual exceptions. The 30 September Retailaer case study is research input for that later milestone.</p>
+    </section>
+    <footer>30 September update: 133 unit tests, nine conformance cases, Ruff, mypy, source/build verification, and Chromium 154 checks passed locally. An overnight research agent failed during Pidgin OAuth refresh and consumed its 9,000-token reservation; live recovery remains unverified. The assistant-edit runner is tested locally but has not launched a real assistant. No push, remote CI run, or general app-wide guarantee is claimed.</footer>
+  </div>
+</main>
+</body>
+</html>

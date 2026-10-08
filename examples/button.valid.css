@@ -1,0 +1,15 @@
+/* Authored component CSS consumes the separately generated tokens.css. */
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-surface-canvas);
+  background-color: var(--color-action-primary);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+@media (min-width: 48rem) {
+  .primary-button {
+    gap: var(--space-3);
+  }
+}

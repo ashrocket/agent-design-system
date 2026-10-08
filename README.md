@@ -6,6 +6,28 @@ and decision trees. The reference `adsys` CLI can report violations, propose or
 apply safe coercions, reject unsafe values, emit SARIF, and keep an append-only
 audit log—without calling a model.
 
+The practical goal is to keep coding assistants inside the design system. Export
+the approved contract with `adsys context`, generate its CSS variables with
+`adsys tokens`, and check authored styles using `adsys check --input-format css`.
+The source gate catches literal values, unapproved tokens and local variable
+overrides in inspected CSS. See [the assistant workflow](docs/assistant-enforcement.md)
+for the contract, repair loop and source-coverage limits.
+For a project, `adsys project-check examples/assistant-app.project.json` discovers
+non-excluded CSS under a reviewed root, checks generated-token parity, and flags
+every other uninspected file unless explicitly excluded. Static HTML class names
+must have simple base rules in directly linked, inspected CSS. CI pins the example
+contract fingerprint.
+An opt-in static TSX component profile uses a separately installed, pinned
+TypeScript parser. It accepts a deliberately small JSX syntax and links class
+names to directly imported, inspected CSS. See the [source gate guide](docs/assistant-enforcement.md)
+for setup and limits. A separate [rendered React fixture](docs/assistant-enforcement.md#rendered-react-fixture) now checks one app-authored, exact-pinned entry and HTML host through a locked build and Chromium computed-style probe. Compliant App/CSS edits can change the rendered result; the fixed entry profile does not establish a general React-app pass.
+
+`adsys tailwind-audit` is an advisory, read-only source inventory for Tailwind
+`@theme` colors and TSX class attributes. It reports default-palette colors,
+arbitrary hex colors outside a supplied canon, unresolved colors, and dynamic
+class expressions. Findings return zero by default so an initial CI trial can
+collect evidence without gating a release. See [its scope and invocation](docs/assistant-enforcement.md#advisory-tailwind-and-tsx-audit).
+
 The repository also includes an optional, budget-gated nightly research harness.
 It asks one small question about the format, records evidence and proposals for
 human review, and refuses to start when daily, weekly, or monthly token
@@ -13,6 +35,12 @@ reservations are exhausted.
 
 Status: early alpha. The core mechanics work and are tested; ADSF 0.1 is a
 proposal, not yet a community standard.
+
+The [30 September Retailaer case study](docs/retailaer-case-study-2026-09-30.html)
+refreshes the next research goal using a real page: distinguish enforceable brand
+rules, rendered measurements, and visual judgment, with controls against false
+positives. It records an audit and a proposed milestone, not a Retailaer adapter
+or a completed real-assistant trial.
 
 ## Why this shape
 

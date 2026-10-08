@@ -8,14 +8,22 @@ An ADSF check remains deterministic, offline, and free to run.
 1. `adsys research plan` reads the append-only ledger, checks UTC daily,
    calendar-week, and calendar-month windows, enforces the per-day run count,
    observes question cooldowns, and reserves the next question's declared cost.
-2. A runner gives the generated read-only prompt and result schema to an agent.
+2. The local `research run` command durably appends the reserved charge before
+   starting Codex. A runner then gives the read-only prompt and schema to an agent.
+   Detached jobs can use `research reserve` with the same budget and question
+   files as `research plan`; reservation rechecks the question and current UTC
+   budget under one ledger lock and rejects stale plans before launch.
 3. `adsys research record` validates identity and basic result structure, writes
-   an immutable result envelope, and appends a ledger entry.
+   a result envelope, and appends a settlement entry. Ledger loading uses the
+   latest entry for each run ID, so a reservation and settlement count once.
 4. Every attempt is charged the greater of reserved tokens or measured usage.
    Failed, empty, and malformed runs are still charged their reservation.
 
 Recording is idempotent by run ID. Retrying a publish job returns the existing
-ledger entry rather than charging the same agent attempt twice.
+settlement rather than charging the same agent attempt twice. If a local process
+is interrupted before settlement, its reservation remains charged and blocks a
+duplicate run. Malformed usage counters invalidate the result and retain the
+minimum reserved charge.
 
 The preflight reservation is the hard local gate. It prevents starting work that
 would exceed a configured rolling window, but it is not an OpenAI account spend
@@ -37,11 +45,23 @@ Run once with an authenticated Codex CLI:
 adsys research run
 ```
 
-The runner uses `codex exec --ephemeral --sandbox read-only --json` with low
-reasoning effort and low response verbosity, requests a schema-constrained final
+The runner uses `codex exec` with `--ignore-user-config`, `--ephemeral`,
+`--sandbox read-only`, and `--json`. It sets low reasoning effort and low
+response verbosity, requests a schema-constrained final
 result, and parses the `turn.completed` usage event. The official Codex
 non-interactive documentation describes JSONL events and usage:
 <https://developers.openai.com/codex/non-interactive-mode>.
+Ignoring user configuration keeps unrelated MCP/plugin accounts out of this
+read-only research run; Codex authentication still uses the configured
+`CODEX_HOME`. A 30 September local run failed during a Pidgin OAuth refresh
+before producing a valid research result and was charged its 9,000-token
+reservation. The flag has unit coverage, but a successful subsequent live run
+is still required to verify the recovery.
+The flag does not disable managed or project-supplied plugin/rule sources;
+inspect the effective tool inventory before depending on it for a stronger
+isolation claim. Failed-agent diagnostics are reduced to safe reason codes,
+and tracked result envelopes keep only a digest and byte count of malformed
+raw output, not raw stderr that might contain credentials.
 
 Use cron, launchd, or another scheduler to call the command once nightly. The
 command exits successfully without invoking Codex when a budget or cooldown gate
@@ -53,11 +73,14 @@ says `skip`.
 read-only job, following the official GitHub Action guidance:
 <https://developers.openai.com/codex/github-action>.
 
-The key-bearing job has only `contents: read`; the final Codex step uses a
-read-only sandbox and cannot publish. A later job, which never receives the API
-key, records the reserved charge and pushes only the ledger/result envelope to
-`automation/research-state`. That branch backs an open pull request, so research
-never changes the default branch without human review.
+The keyless plan job first commits and pushes the reservation to
+`automation/research-state`. If that push fails, the model job cannot start.
+The key-bearing job has only `contents: read`; its Codex step uses a read-only
+sandbox and cannot publish. A later keyless job settles the attempt on the state
+branch. Cancellation or failure of that job leaves the minimum reservation
+charged. The branch backs an open pull request, so research never changes the
+default branch without human review. This sequence has passed local checks but
+has not been verified by a remote workflow run.
 
 The GitHub cron is fail-closed by default so publishing this repository cannot
 silently create a second budget ledger alongside a local scheduler. To use

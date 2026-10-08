@@ -1,0 +1,10 @@
+{
+  "name": "@adsf/static-tsx-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional parser for the ADSF static TSX source profile",
+  "engines": {"node": ">=20"},
+  "dependencies": {
+    "typescript": "6.0.3"
+  }
+}

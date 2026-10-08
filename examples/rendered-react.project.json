@@ -1,0 +1,20 @@
+{
+  "format": "adsf-css-project",
+  "version": "0.1.0",
+  "root": "rendered-react-source",
+  "system": "aurora.design-system.json",
+  "tokens": "tokens.css",
+  "exclusions": [],
+  "tsx": {
+    "profile": "static-jsx-v1",
+    "adapter_sha256": "362745c4ebe8743031eb07121b81766aeb26064e40f797378a2830653abd6318",
+    "lock_sha256": "27addf51ab3806b6e7cc4fa6506d80f782c93a71dba05ac3fcf5dcd78aad42a4"
+  },
+  "app": {
+    "profile": "pinned-react-entry-v1",
+    "host": "index.html",
+    "host_sha256": "ee9a5bfac05c54185d82466c9caf34561d776660a34a102078558769e5100487",
+    "entry": "main.tsx",
+    "entry_sha256": "72da1443db0148098b5454fc2ff659c609f46508294e116f5e63401f93e900c1"
+  }
+}

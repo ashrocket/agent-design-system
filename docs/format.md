@@ -11,6 +11,9 @@ of the fields the reference enforcer executes.
 path is the dot-joined sequence of object keys below `tokens`; for example,
 `tokens.color.text.primary` declares `{color.text.primary}`. A `$value` may be a
 reference to another token. References must exist and may not form cycles.
+Token and group keys contain only ASCII letters, digits, underscores and hyphens;
+dots are path separators, never part of a key. JSON files must have unique object
+keys and finite numbers. Numeric equality does not round integers through floats.
 
 ADSF 0.1 computes nearest-token coercion for numbers and three- or six-digit hex
 colors. Numeric distance is absolute difference. Color distance is Euclidean
@@ -29,6 +32,8 @@ The selector language is intentionally smaller than JSONPath:
 
 Object iteration follows document order, but results must not depend on that
 order. Selectors do not contain filters, functions, escaping, or mutation.
+Recursive selectors return each actual path once, even when several recursive
+segments can reach it. Violation order follows rule order then traversal order.
 
 ## Assertions
 
@@ -70,6 +75,11 @@ Coercion supports `nearest-token` and a literal `replace` value.
 All rules inspect the same original document. Fixes are applied afterward in
 rule order, so check and fix produce the same violation log; if multiple rules
 coerce the same path, the last declared rule supplies the written value.
+Literal `null` is a valid replacement. `changed` describes actual output changes,
+not the number of proposed repairs. Root coercions are unsupported. A fix plan
+that replaces both an ancestor and a descendant is invalid and writes nothing.
+After applying repairs, the CLI checks the complete output again; a replacement
+that still violates any rule cannot produce a successful fix exit status.
 
 ## Exit behavior and logs
 
@@ -77,3 +87,8 @@ By default, `error` violations fail with exit code 1. `--fail-on` accepts
 `info`, `warning`, `error`, or `never`. A `reject` decision always fails. Invalid
 input or configuration exits 2. Passing `--log` appends one JSON object per
 observed violation; logs never contain model output or hidden state.
+Log paths cannot alias the system, inspected input, or fix output. `--output`
+cannot alias either input (including symlinks and hardlinks); `--write` is required
+to replace the inspected document, and the design system is always protected.
+In-place writes require a direct input path rather than a symlink. An original
+`reject` decision still fails the fix command even if another rule repairs it.

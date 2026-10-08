@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keeping coding assistants inside the design system — research brief</title>
+  <style>
+    :root { color-scheme: light; --ink:#1e293b; --blue:#2563eb; --muted:#526277; --paper:#f8fafc; --line:#dbe3ed; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#e9eef5; color:var(--ink); font:17px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:850px; margin:36px auto; padding:48px 56px 38px; background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:0 20px 60px rgba(30,41,59,.08); }
+    .eyebrow { margin:0 0 16px; color:#2357b7; font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { max-width:710px; margin:0; font:700 clamp(2.35rem,5vw,3.6rem)/1.08 Georgia,"Times New Roman",serif; letter-spacing:-.035em; }
+    .lead { margin:22px 0 0; max-width:690px; font-size:1.18rem; line-height:1.5; color:#344357; }
+    .status { display:inline-block; margin-top:24px; padding:6px 12px; border:1px solid #b6cdfa; border-radius:999px; background:#eef4ff; color:#194ca9; font-size:13px; font-weight:750; }
+    .rule { width:58px; height:4px; margin:32px 0; border:0; border-radius:3px; background:var(--blue); }
+    .numbers { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 34px; }
+    .metric { min-height:110px; padding:15px 18px; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
+    .metric strong { display:block; font:700 2rem/1.15 Georgia,serif; color:#184a9f; }
+    .metric span { display:block; margin-top:6px; color:var(--muted); font-size:13px; line-height:1.35; }
+    section { padding-top:24px; border-top:1px solid var(--line); }
+    section + section { margin-top:24px; }
+    h2 { margin:0 0 10px; font:700 1.35rem/1.25 Georgia,serif; }
+    p { margin:0 0 13px; }
+    p:last-child { margin-bottom:0; }
+    code { padding:1px 4px; border-radius:4px; background:#edf2f8; font: .88em/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    .finding { padding:16px 18px; border-left:4px solid var(--blue); border-radius:0 10px 10px 0; background:#f1f6ff; }
+    .chain { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:18px 0 2px; color:#2357b7; font-size:13px; font-weight:750; }
+    .chain span { padding:7px 10px; border:1px solid #c6d8fa; border-radius:8px; background:#f5f8ff; }
+    .chain b { color:#8698ae; }
+    footer { margin-top:28px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; line-height:1.5; }
+    @media(max-width:650px) { body{background:#fff;} main{margin:0;padding:30px 22px 38px;border:0;border-radius:0;box-shadow:none;} .numbers{grid-template-columns:1fr;} .metric{min-height:0;} .rule{margin:26px 0;} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Agent Design System / research brief / 29 September 2026</p>
+    <h1>Keeping coding assistants inside the design system</h1>
+    <p class="lead">Coding assistants can read a design system and still put unapproved colors or spacing into an app. This work turns the design rules into a source check across a declared project.</p>
+    <span class="status">Partial · local checkpoint validated, not pushed</span>
+  </header>
+  <hr class="rule">
+  <div class="numbers" aria-label="Verified checkpoint figures">
+    <div class="metric"><strong>109</strong><span>local unit tests passed</span></div>
+    <div class="metric"><strong>9</strong><span>normative conformance cases passed</span></div>
+    <div class="metric"><strong>3</strong><span>source workflow verifiers passed</span></div>
+  </div>
+  <section>
+    <h2>What the work established</h2>
+    <p class="finding">Give the assistant a readable contract, then independently check the source it wrote. A prompt alone cannot prove that app code follows the approved system.</p>
+    <div class="chain" aria-label="Enforcement flow"><span>Approved tokens</span><b>→</b><span>Generated CSS + assistant context</span><b>→</b><span>Project source check</span><b>→</b><span>Reviewed handoff</span></div>
+    <p>The CSS policy binds tokens to allowed properties. <code>adsys check</code> reports source violations without editing files; it rejects literal drift, unknown variables, fallbacks, local token shadowing, and unsupported syntax. <code>adsys fix</code> makes exact repairs and rechecks them. Core enforcement is deterministic and offline.</p>
+  </section>
+  <section>
+    <h2>What the project check adds</h2>
+    <p><code>adsys project-check</code> scans an explicit root, verifies the generated token stylesheet byte for byte, and inventories static HTML references. The fixture passes with two authored CSS files, 15 declarations, and one HTML file. Drift, stale tokens, inline styles, and a changed manifest fail the pinned check.</p>
+    <p>Every non-excluded file receives an outcome. CSS and HTML are inspected; exact contract files are trusted; unsupported formats fail as <code>adapter-required</code>. An opt-in TSX profile adds bounded source inspection.</p>
+    <p>Panel probes exposed HTML bypasses through <code>&lt;base&gt;</code>, duplicate links, token links hidden in inert markup, and empty class rules. These now fail. Each static HTML class must have a nonempty base rule in CSS directly linked by that page.</p>
+  </section>
+  <section>
+    <h2>The new TSX boundary</h2>
+    <p>The opt-in TSX profile uses the <a href="https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API">TypeScript Compiler API</a> to inspect a static JSX component. It permits local CSS imports and one static function. Every literal <code>className</code> must resolve to an inspected, directly imported CSS rule; the token sheet must also be imported.</p>
+    <p>The panel reproduced three bypasses: <code>@jsx</code> factory replacement, <code>amd-dependency</code> injection, and a fake <code>node</code> on <code>PATH</code>. All now fail. The runner requires an explicit trusted Node binary and verifies parser, sidecar, and lock bytes. The CI verifier also holds a fixed contract fingerprint.</p>
+  </section>
+  <section>
+    <h2>Verification and research record</h2>
+    <p>Local verification passed: 109 unit tests, nine normative cases, Ruff, mypy, three source-workflow verifiers, actionlint, and validate/check/fix/recheck. The invalid example's three errors are repaired; its accessibility warning remains. Remote CI has not run.</p>
+    <p>The separate research ledger records nine failed attempts and no valid finding. Each attempt was charged its reservation. The runner now reserves budget before starting Codex; the revised GitHub sequence has not been verified remotely.</p>
+  </section>
+  <section>
+    <h2>Boundary and next decision</h2>
+    <p>TSX passing means only that static component source met this narrow profile. React entrypoints, transitive imports, bundles, browser styles, runtime changes, semantics, and accessibility remain unverified. Next: close the app graph and inspect the built behavior in a browser.</p>
+    <p>Excluded files remain uninspected. The manifest, exclusions, hashes, fingerprint, and CI command need independent review. The optional parser currently installs in a source checkout; a wheel alone does not include <code>node_modules</code>.</p>
+  </section>
+  <footer>Key files: <code>css.py</code>, <code>project.py</code>, <code>tsx.py</code>, <code>docs/assistant-enforcement.md</code>, and <code>docs/iteration-2026-09-28.md</code>. This brief was visually reviewed in Chrome; the application was not. No push or remote CI run.</footer>
+</main>
+</body>
+</html>

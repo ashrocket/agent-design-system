@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adsf:schema:css-project-manifest:0.1.0",
+  "title": "ADSF CSS project coverage manifest",
+  "type": "object",
+  "required": ["format", "version", "root", "system", "tokens", "exclusions"],
+  "additionalProperties": false,
+  "dependentRequired": {"app": ["tsx"]},
+  "properties": {
+    "format": {"const": "adsf-css-project"},
+    "version": {"const": "0.1.0"},
+    "root": {"type": "string", "minLength": 1},
+    "system": {"type": "string", "minLength": 1},
+    "tokens": {"type": "string", "minLength": 1},
+    "tsx": {
+      "type": "object",
+      "required": ["profile", "adapter_sha256", "lock_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {"const": "static-jsx-v1"},
+        "adapter_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "lock_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "app": {
+      "type": "object",
+      "required": ["profile", "host", "host_sha256", "entry", "entry_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {"const": "pinned-react-entry-v1"},
+        "host": {"type": "string", "minLength": 1},
+        "host_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "entry": {"type": "string", "minLength": 1},
+        "entry_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
