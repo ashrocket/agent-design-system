@@ -25,6 +25,10 @@ jobs:
           node-version: "24"
       - name: Install package
         run: python -m pip install -e ".[dev]"
+      - name: Install trusted pilot CLI
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --no-deps -e .
       - name: Install optional static TSX parser
         run: npm ci --prefix src/agent_design_system/adapters/tsx --ignore-scripts --no-audit --no-fund
       - name: Select trusted Node binary for the optional parser

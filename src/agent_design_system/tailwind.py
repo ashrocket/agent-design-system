@@ -25,8 +25,22 @@ MAX_FILES = 1_000
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
 MAX_FINDINGS = 5_000
 COLOR_UTILITIES = (
-    "placeholder", "decoration", "outline", "accent", "border", "divide",
-    "stroke", "shadow", "caret", "fill", "from", "ring", "text", "bg", "via", "to",
+    "placeholder",
+    "decoration",
+    "outline",
+    "accent",
+    "border",
+    "divide",
+    "stroke",
+    "shadow",
+    "caret",
+    "fill",
+    "from",
+    "ring",
+    "text",
+    "bg",
+    "via",
+    "to",
 )
 DEFAULT_PALETTES = frozenset(
     "slate gray zinc neutral stone red orange amber yellow lime green emerald "
@@ -89,8 +103,10 @@ def _canon_colors(path: Path, dotted_path: str) -> set[str]:
             value = value[part]
     except (KeyError, TypeError) as error:
         raise FormatError("canon path does not exist") from error
-    if not isinstance(value, list) or not value or not all(
-        isinstance(item, str) for item in value
+    if (
+        not isinstance(value, list)
+        or not value
+        or not all(isinstance(item, str) for item in value)
     ):
         raise FormatError("canon path must contain a nonempty color array")
     return {_hex(item) for item in value}
@@ -100,7 +116,9 @@ def _theme_colors(path: Path) -> dict[str, tuple[str, int]]:
     source = _direct_file(path, "theme CSS").read_text(encoding="utf-8")
     # Comments cannot introduce declarations or braces. Preserve other source
     # byte positions; this scanner inspects only flat @theme declarations.
-    masked = re.sub(r"/\*.*?\*/", lambda match: " " * len(match.group()), source, flags=re.S)
+    masked = re.sub(
+        r"/\*.*?\*/", lambda match: " " * len(match.group()), source, flags=re.S
+    )
     blocks = list(THEME_START.finditer(masked))
     if len(blocks) != 1:
         raise FormatError("theme CSS must contain exactly one @theme block")
@@ -174,8 +192,13 @@ def _inspect_tsx(path: Path, relative: str) -> dict[str, Any]:
         result = subprocess.run(
             [_node_binary(), "--max-old-space-size=256", str(ADAPTER)],
             input=json.dumps({"path": relative, "source": source}),
-            capture_output=True, text=True, encoding="utf-8", timeout=15,
-            cwd=ADAPTER_DIR, env=environment, check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=15,
+            cwd=ADAPTER_DIR,
+            env=environment,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise FormatError(f"Tailwind TSX parser unavailable: {relative}") from error
@@ -184,19 +207,29 @@ def _inspect_tsx(path: Path, relative: str) -> dict[str, Any]:
     try:
         report = json.loads(result.stdout)
     except ValueError as error:
-        raise FormatError(f"Tailwind TSX parser returned invalid JSON: {relative}") from error
+        raise FormatError(
+            f"Tailwind TSX parser returned invalid JSON: {relative}"
+        ) from error
     digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
     if (
         not isinstance(report, dict)
-        or set(report) != {
-            "protocol", "parser_version", "source_sha256", "jsx_class_attributes",
-            "dynamic_class_attributes", "classes", "issues",
+        or set(report)
+        != {
+            "protocol",
+            "parser_version",
+            "source_sha256",
+            "jsx_class_attributes",
+            "dynamic_class_attributes",
+            "classes",
+            "issues",
         }
         or report["protocol"] != "adsf-tailwind-tsx-v1"
         or report["parser_version"] != PARSER_VERSION
         or report["source_sha256"] != digest
         or any(
-            not isinstance(report[key], int) or isinstance(report[key], bool) or report[key] < 0
+            not isinstance(report[key], int)
+            or isinstance(report[key], bool)
+            or report[key] < 0
             for key in ("jsx_class_attributes", "dynamic_class_attributes")
         )
         or report["dynamic_class_attributes"] > report["jsx_class_attributes"]
@@ -206,15 +239,26 @@ def _inspect_tsx(path: Path, relative: str) -> dict[str, Any]:
         or len(report["issues"]) > 1_000
     ):
         raise FormatError(f"invalid Tailwind TSX parser envelope: {relative}")
-    for key, fields in (("classes", {"name", "line", "column"}),
-                        ("issues", {"code", "line", "column", "message"})):
+    for key, fields in (
+        ("classes", {"name", "line", "column"}),
+        ("issues", {"code", "line", "column", "message"}),
+    ):
         for item in report[key]:
-            if not isinstance(item, dict) or set(item) != fields or any(
-                not isinstance(item[field], int) or isinstance(item[field], bool) or item[field] < 1
-                for field in ("line", "column")
+            if (
+                not isinstance(item, dict)
+                or set(item) != fields
+                or any(
+                    not isinstance(item[field], int)
+                    or isinstance(item[field], bool)
+                    or item[field] < 1
+                    for field in ("line", "column")
+                )
             ):
                 raise FormatError(f"invalid Tailwind TSX {key}: {relative}")
-            if not isinstance(item["name" if key == "classes" else "code"], str) or not item["name" if key == "classes" else "code"]:
+            if (
+                not isinstance(item["name" if key == "classes" else "code"], str)
+                or not item["name" if key == "classes" else "code"]
+            ):
                 raise FormatError(f"invalid Tailwind TSX {key}: {relative}")
             if key == "issues" and not isinstance(item["message"], str):
                 raise FormatError(f"invalid Tailwind TSX {key}: {relative}")
@@ -246,12 +290,17 @@ def _color_utility(token: str) -> tuple[str, str] | None:
             suffix = base[len(family) + 1 :].split("/", 1)[0]
             if not suffix or suffix in NONCOLOR_SUFFIXES.get(family, ()):
                 return None
-            if family == "text" and (suffix.isdigit() or re.fullmatch(r"\d?xl", suffix)):
+            if family == "text" and (
+                suffix.isdigit() or re.fullmatch(r"\d?xl", suffix)
+            ):
                 return None
-            if family == "bg" and suffix.startswith(("gradient-", "linear-", "radial-", "conic-")):
+            if family == "bg" and suffix.startswith(
+                ("gradient-", "linear-", "radial-", "conic-")
+            ):
                 return None
             if family in {"border", "ring", "outline", "stroke"} and (
-                suffix.isdigit() or suffix in {"solid", "dashed", "dotted", "double", "none"}
+                suffix.isdigit()
+                or suffix in {"solid", "dashed", "dotted", "double", "none"}
             ):
                 return None
             return family, suffix
@@ -259,8 +308,12 @@ def _color_utility(token: str) -> tuple[str, str] | None:
 
 
 def audit_tailwind(
-    *, tsx_root: str | Path, theme_css: str | Path, canon: str | Path,
-    canon_path: str, excludes: tuple[str, ...] = (),
+    *,
+    tsx_root: str | Path,
+    theme_css: str | Path,
+    canon: str | Path,
+    canon_path: str,
+    excludes: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Return deterministic findings and explicit source-coverage counts."""
     root = Path(tsx_root).absolute()
@@ -273,7 +326,9 @@ def audit_tailwind(
     def finding(code: str, source: str, line: int, value: str) -> None:
         counts[code] += 1
         if len(findings) < MAX_FINDINGS:
-            findings.append({"code": code, "source": source, "line": line, "value": value})
+            findings.append(
+                {"code": code, "source": source, "line": line, "value": value}
+            )
 
     for name, (value, line) in sorted(theme.items()):
         rgb = _literal_rgb(value)
@@ -304,7 +359,12 @@ def audit_tailwind(
                 continue
             if suffix in {"white", "black"}:
                 if {"white": "#ffffff", "black": "#000000"}[suffix] not in allowed:
-                    finding("builtin-color-outside-canon", relative, item["line"], item["name"])
+                    finding(
+                        "builtin-color-outside-canon",
+                        relative,
+                        item["line"],
+                        item["name"],
+                    )
                 continue
             if suffix.startswith("[") and suffix.endswith("]"):
                 value = suffix[1:-1]
@@ -313,21 +373,52 @@ def audit_tailwind(
                 rgb = _literal_rgb(value)
                 if rgb is not None:
                     if rgb not in allowed:
-                        finding("arbitrary-color-outside-canon", relative, item["line"], item["name"])
-                elif value.startswith(("var(", "oklch(", "rgb(", "rgba(", "hsl(", "hsla(", "color-mix(", "color:")):
-                    finding("arbitrary-color-unresolved", relative, item["line"], item["name"])
+                        finding(
+                            "arbitrary-color-outside-canon",
+                            relative,
+                            item["line"],
+                            item["name"],
+                        )
+                elif value.startswith(
+                    (
+                        "var(",
+                        "oklch(",
+                        "rgb(",
+                        "rgba(",
+                        "hsl(",
+                        "hsla(",
+                        "color-mix(",
+                        "color:",
+                    )
+                ):
+                    finding(
+                        "arbitrary-color-unresolved",
+                        relative,
+                        item["line"],
+                        item["name"],
+                    )
                 continue
             parts = suffix.split("-")
             if len(parts) >= 2 and parts[0] in DEFAULT_PALETTES and parts[-1].isdigit():
                 finding("default-palette-color", relative, item["line"], item["name"])
-            elif suffix.startswith("color-") or _family in {"bg", "fill", "stroke", "from", "via", "to"}:
+            elif suffix.startswith("color-") or _family in {
+                "bg",
+                "fill",
+                "stroke",
+                "from",
+                "via",
+                "to",
+            }:
                 finding("unknown-color-token", relative, item["line"], item["name"])
     return {
-        "format": "adsf-tailwind-audit", "version": "0.1.0",
+        "format": "adsf-tailwind-audit",
+        "version": "0.1.0",
         "coverage": {
-            "tsx_files": len(files), "jsx_class_attributes": class_attributes,
+            "tsx_files": len(files),
+            "jsx_class_attributes": class_attributes,
             "dynamic_class_attributes": dynamic_attributes,
-            "static_class_tokens": class_tokens, "theme_color_tokens": len(theme),
+            "static_class_tokens": class_tokens,
+            "theme_color_tokens": len(theme),
             "tsx_files_with_syntax_errors": syntax_files,
             "uninspected": "non-TSX sources, runtime/generated class names, and non-color Tailwind utilities",
         },

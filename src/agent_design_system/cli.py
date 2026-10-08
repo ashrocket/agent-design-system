@@ -250,8 +250,11 @@ def _validate(args: argparse.Namespace) -> int:
 
 def _tailwind_audit(args: argparse.Namespace) -> int:
     report = audit_tailwind(
-        tsx_root=args.tsx_root, theme_css=args.theme_css, canon=args.canon,
-        canon_path=args.canon_path, excludes=tuple(args.exclude),
+        tsx_root=args.tsx_root,
+        theme_css=args.theme_css,
+        canon=args.canon,
+        canon_path=args.canon_path,
+        excludes=tuple(args.exclude),
     )
     if args.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True))
