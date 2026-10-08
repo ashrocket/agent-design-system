@@ -139,10 +139,10 @@ missing exclusion is reported as unused. `.git` is the only built-in exclusion.
 ```sh
 adsys project-check examples/assistant-app.project.json --format json
 adsys project-check examples/assistant-app.project.json \
-  --expected-sha256 4be9001fef49440bee48e19b1aa938e95d44007960b52df28cdc4310dcf3315a
+  --expected-sha256 c326c50ff19b37d2955207838e5795e8642b508bbd255a3fb2cf35d4c1ff4d57
 adsys context examples/aurora.design-system.json \
   --project-manifest examples/assistant-app.project.json \
-  --expected-sha256 4be9001fef49440bee48e19b1aa938e95d44007960b52df28cdc4310dcf3315a \
+  --expected-sha256 c326c50ff19b37d2955207838e5795e8642b508bbd255a3fb2cf35d4c1ff4d57 \
   --output /tmp/assistant-contract.md
 ```
 

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "examples/assistant-app.project.json"
 ADAPTER_SHA256 = "362745c4ebe8743031eb07121b81766aeb26064e40f797378a2830653abd6318"
 LOCK_SHA256 = "27addf51ab3806b6e7cc4fa6506d80f782c93a71dba05ac3fcf5dcd78aad42a4"
-CONTRACT_SHA256 = "7278e40e9bbced82f566f2dbb3121585df90a7207382dbf984d5d42d50895892"
+CONTRACT_SHA256 = "ca054b52cff9c76d012c7654d0483af8164df8780b45afd52bd7cb4f254e5817"
 APP_SOURCE = """import "./tokens.css";
 import "./layout.css";
 import "./components/button.css";

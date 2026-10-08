@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "examples/assistant-app.project.json"
-FINGERPRINT = "4be9001fef49440bee48e19b1aa938e95d44007960b52df28cdc4310dcf3315a"
+FINGERPRINT = "c326c50ff19b37d2955207838e5795e8642b508bbd255a3fb2cf35d4c1ff4d57"
 
 
 def check(manifest: Path, expected: int = 0) -> dict:
