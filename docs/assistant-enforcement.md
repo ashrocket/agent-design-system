@@ -236,6 +236,33 @@ does not verify a React entrypoint, imported component graph, bundler output,
 browser loading, computed styles or runtime mutations. Work toward a real app
 PASS must close those paths and verify the built behavior separately.
 
+## Advisory Tailwind and TSX audit
+
+`tailwind-audit` is a read-only inventory for a Tailwind app that cannot use the
+restrictive static TSX profile above. It scans direct `.tsx` files under a root,
+literal and enumerable JSX `className`/`class` tokens, and one flat authored
+`@theme` block. It compares theme hex values and arbitrary hex utilities with a
+JSON canon array, reports Tailwind default-palette utilities, and records dynamic
+class expressions as explicit coverage gaps. It neither imports app code nor
+loads a model. The optional exact TypeScript 6.0.3 parser and trusted Node path
+are installed as described above.
+
+```sh
+export ADSF_NODE_BIN="$(command -v node)"
+python -m agent_design_system tailwind-audit \
+  --tsx-root PATH/TO/src --theme-css PATH/TO/src/index.css \
+  --canon PATH/TO/design/canon.json --canon-path swatches.web.hexes \
+  --exclude '__tests__/*' --format json > tailwind-audit.json
+```
+
+An audit with findings exits zero unless `--fail-on-findings` is supplied.
+Input, parser, and protocol failures exit 2. The JSON report includes exact
+source hashes, counts, up to 5,000 location-bearing findings, and a truncation
+count. It does not inspect CSS outside the specified `@theme`, other file types,
+runtime class values, generated markup, visual output, or whether a token is
+appropriate for its role. An audit result is therefore never an app-wide pass.
+Keep it advisory until the coverage and policy are reviewed for the app.
+
 ## Rendered React fixture
 
 The optional fixture in `examples/rendered-react-source/` takes the next narrow

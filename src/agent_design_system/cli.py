@@ -30,6 +30,7 @@ from .research import (
     status_report,
 )
 from .scheduler import render_macos_launch_agent, write_macos_launch_agent
+from .tailwind import audit_tailwind
 
 DEFAULT_CONFORMANCE_MANIFEST = (
     Path(__file__).resolve().parent / "conformance_suite" / "manifest.json"
@@ -101,6 +102,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     project_check.add_argument("--format", choices=("text", "json"), default="text")
     project_check.set_defaults(handler=_project_check)
+
+    tailwind = commands.add_parser(
+        "tailwind-audit", help="advisory audit of Tailwind colors in TSX and @theme"
+    )
+    tailwind.add_argument("--tsx-root", required=True)
+    tailwind.add_argument("--theme-css", required=True)
+    tailwind.add_argument("--canon", required=True)
+    tailwind.add_argument("--canon-path", default="swatches.web.hexes")
+    tailwind.add_argument("--exclude", action="append", default=[])
+    tailwind.add_argument("--format", choices=("text", "json"), default="text")
+    tailwind.add_argument("--fail-on-findings", action="store_true")
+    tailwind.set_defaults(handler=_tailwind_audit)
 
     conformance = commands.add_parser(
         "conformance", help="run language-neutral ADSF conformance vectors"
@@ -235,6 +248,27 @@ def _validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _tailwind_audit(args: argparse.Namespace) -> int:
+    report = audit_tailwind(
+        tsx_root=args.tsx_root, theme_css=args.theme_css, canon=args.canon,
+        canon_path=args.canon_path, excludes=tuple(args.exclude),
+    )
+    if args.format == "json":
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        coverage = report["coverage"]
+        print(
+            f"TSX files: {coverage['tsx_files']}; class attributes: "
+            f"{coverage['jsx_class_attributes']}; dynamic: "
+            f"{coverage['dynamic_class_attributes']}; findings: "
+            f"{sum(report['finding_counts'].values())}"
+        )
+        for code, count in report["finding_counts"].items():
+            print(f"{code}: {count}")
+        print(f"Coverage limit: {coverage['uninspected']}")
+    return 1 if args.fail_on_findings and report["finding_counts"] else 0
+
+
 def _check(args: argparse.Namespace) -> int:
     _guard_enforcement_paths(args, fixing=False)
     result = _enforcement_result(args, apply_fixes=False)
@@ -278,6 +312,8 @@ def _guard_enforcement_paths(args: argparse.Namespace, *, fixing: bool) -> None:
         if args.write and Path(args.document).is_symlink():
             raise FormatError("--write requires a direct input path, not a symlink")
         destination = args.document if args.write else args.output
+        if Path(destination).is_symlink():
+            raise FormatError("output requires a direct path, not a symlink")
         if _same_path(destination, args.system):
             raise FormatError("output must not overwrite the design system")
         if not args.write and _same_path(destination, args.document):

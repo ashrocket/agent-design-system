@@ -22,6 +22,12 @@ TypeScript parser. It accepts a deliberately small JSX syntax and links class
 names to directly imported, inspected CSS. See the [source gate guide](docs/assistant-enforcement.md)
 for setup and limits. A separate [rendered React fixture](docs/assistant-enforcement.md#rendered-react-fixture) now checks one app-authored, exact-pinned entry and HTML host through a locked build and Chromium computed-style probe. Compliant App/CSS edits can change the rendered result; the fixed entry profile does not establish a general React-app pass.
 
+`adsys tailwind-audit` is an advisory, read-only source inventory for Tailwind
+`@theme` colors and TSX class attributes. It reports default-palette colors,
+arbitrary hex colors outside a supplied canon, unresolved colors, and dynamic
+class expressions. Findings return zero by default so an initial CI trial can
+collect evidence without gating a release. See [its scope and invocation](docs/assistant-enforcement.md#advisory-tailwind-and-tsx-audit).
+
 The repository also includes an optional, budget-gated nightly research harness.
 It asks one small question about the format, records evidence and proposals for
 human review, and refuses to start when daily, weekly, or monthly token
