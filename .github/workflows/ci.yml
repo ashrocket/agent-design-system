@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,26 +19,42 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Test change scoping
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Determine check scope
+        id: scope
+        run: python3 scripts/ci_scope.py
       - uses: actions/setup-python@v6
+        if: steps.scope.outputs.full != 'false'
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package
+        if: steps.scope.outputs.full != 'false'
         run: python -m pip install -e ".[dev]"
       - name: Run unit tests
+        if: steps.scope.outputs.full != 'false'
         run: python -m unittest discover -s tests -v
       - name: Check formatting
+        if: steps.scope.outputs.full != 'false'
         run: ruff format --check src tests
       - name: Lint
+        if: steps.scope.outputs.full != 'false'
         run: ruff check src tests
       - name: Type-check
+        if: steps.scope.outputs.full != 'false'
         run: mypy src/agent_design_system
       - name: Validate example system
+        if: steps.scope.outputs.full != 'false'
         run: adsys validate examples/aurora.design-system.json
       - name: Check passing example
+        if: steps.scope.outputs.full != 'false'
         run: adsys check examples/aurora.design-system.json examples/button.valid.json
       - name: Run normative conformance suite
+        if: steps.scope.outputs.full != 'false'
         run: adsys conformance
       - name: Verify failing example fails
+        if: steps.scope.outputs.full != 'false'
         run: |
           if adsys check examples/aurora.design-system.json examples/button.invalid.json; then
             echo "invalid example unexpectedly passed" >&2
