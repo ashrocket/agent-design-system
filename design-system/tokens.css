@@ -1,0 +1,28 @@
+/* ADSF design system — generated from tokens.json */
+:root, [data-theme="light"] {
+  --ground: #ffffff;
+  --ink: #1a1d21;
+  --muted: #59606b;
+  --rule: #d9dce1;
+  --verdict-accept: #1e6b47;
+  --verdict-report: #1f5fad;
+  --verdict-coerce: #8a5a00;
+  --verdict-reject: #b42318;
+}
+:root {
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 48px;
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --font-sans: "Public Sans", system-ui, sans-serif;
+  --font-mono: "Source Code Pro", ui-monospace, monospace;
+}
+.display { font-family: var(--font-sans); font-size: 96px; line-height: 96px; font-weight: 700; }
+.heading { font-family: var(--font-sans); font-size: 32px; line-height: 40px; font-weight: 700; }
+.body { font-family: var(--font-sans); font-size: 18px; line-height: 28px; font-weight: 400; }
+.small { font-family: var(--font-sans); font-size: 14px; line-height: 22px; font-weight: 400; }
+.label { font-family: var(--font-sans); font-size: 14px; line-height: 22px; font-weight: 700; }
+.code { font-family: var(--font-mono); font-size: 14px; line-height: 22px; font-weight: 400; }

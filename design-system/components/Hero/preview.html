@@ -1,0 +1,32 @@
+<!-- @dsCard group="Landing" height=520 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADSF hero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--ground); color: var(--ink); }
+  body { font-family: var(--font-sans); min-height: 100vh; }
+  .hero { box-sizing: border-box; max-width: 960px; margin: 0 auto; padding: var(--space-4) var(--space-2) var(--space-4); }
+  .mark { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+  .sub { margin: var(--space-2) 0 0; color: var(--muted); max-width: 52ch; }
+  .actions { margin-top: var(--space-3); }
+  .btn { display: inline-block; box-sizing: border-box; min-height: 44px; padding: 10px var(--space-2); background: var(--ink); color: var(--ground); border-radius: var(--radius-sm); text-decoration: none; }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+</style>
+</head>
+<body>
+<section class="hero">
+  <p class="mark display">ADSF</p>
+  <p class="sub body">ADSF is an open, vendor-neutral format for design rules.</p>
+  <div class="actions">
+    <a class="btn label" href="#">Read the format</a>
+  </div>
+</section>
+</body>
+</html>

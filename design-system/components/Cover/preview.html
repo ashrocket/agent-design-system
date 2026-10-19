@@ -1,0 +1,51 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADSF cover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--ground); }
+  body { width: 960px; height: 288px; overflow: hidden; position: relative; font-family: var(--font-sans); }
+  .cover { position: relative; width: 960px; height: 288px; background: var(--ground); }
+  svg.art { position: absolute; left: 0; top: 0; width: 960px; height: 288px; display: block; }
+  .f-ink { fill: var(--ink); }
+  .f-accept { fill: var(--verdict-accept); }
+  .f-report { fill: var(--verdict-report); }
+  .f-coerce { fill: var(--verdict-coerce); }
+  .f-reject { fill: var(--verdict-reject); }
+  .plus { stroke: var(--rule); stroke-width: 1; fill: none; }
+  .pattern-fill { fill: url(#plus-grid); }
+  .name { position: absolute; left: 48px; bottom: 40px; margin: 0; color: var(--ink); white-space: nowrap; }
+  .tag { position: absolute; left: 48px; bottom: 16px; margin: 0; color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="cover">
+<svg class="art" viewBox="0 0 960 288" width="960" height="288" aria-hidden="true" shape-rendering="crispEdges">
+  <!-- Derivation 1/4: 5 blocks x 5 identity tokens (ink, verdict-accept, verdict-report, verdict-coerce, verdict-reject). Blocks cover 96768 of 276480 px2, 35 percent. -->
+  <!-- Derivation 2/4: blocks sit only right of x=480. Accept is the widest block at the top; report, coerce and reject step down, one per decision outcome. -->
+  <!-- Derivation 3/4: pattern is a plus grid, 24px pitch, rule token. Chosen because the README calls the brand precise and technical. -->
+  <!-- Derivation 4/4: steps used: space-3 (24px pitch). radius-none on all blocks, so corners stay square. -->
+  <defs>
+    <pattern id="plus-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path class="plus" d="M12 8 V16 M8 12 H16"/>
+    </pattern>
+  </defs>
+  <rect class="pattern-fill" x="480" y="0" width="480" height="288"/>
+  <rect class="f-ink" x="480" y="0" width="96" height="288"/>
+  <rect class="f-accept" x="576" y="0" width="240" height="120"/>
+  <rect class="f-report" x="576" y="120" width="96" height="168"/>
+  <rect class="f-coerce" x="672" y="120" width="144" height="80"/>
+  <rect class="f-reject" x="816" y="200" width="144" height="88"/>
+</svg>
+<p class="name display">ADSF</p>
+<p class="tag small">Agent Design System Format</p>
+</div>
+</body>
+</html>

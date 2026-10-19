@@ -1,0 +1,51 @@
+<!-- @dsCard group="Components" height=260 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADSF verdict</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--ground); color: var(--ink); }
+  body { font-family: var(--font-sans); }
+  .verdicts { box-sizing: border-box; max-width: 960px; margin: 0 auto; padding: var(--space-2); }
+  .title { margin: 0 0 var(--space-2); color: var(--ink); }
+  .row { display: grid; grid-template-columns: minmax(96px, 128px) 1fr; gap: var(--space-2); align-items: baseline; padding: var(--space-2) 0; border-top: 1px solid var(--rule); }
+  .row:last-child { border-bottom: 1px solid var(--rule); }
+  .word { margin: 0; }
+  .meaning { margin: 0; color: var(--ink); }
+  .accept { color: var(--verdict-accept); }
+  .report { color: var(--verdict-report); }
+  .coerce { color: var(--verdict-coerce); }
+  .reject { color: var(--verdict-reject); }
+  @media (max-width: 480px) {
+    .row { grid-template-columns: 1fr; gap: var(--space-1); }
+  }
+</style>
+</head>
+<body>
+<section class="verdicts" aria-label="Verdict states">
+  <h2 class="title heading">Verdict</h2>
+  <div class="row">
+    <p class="word label accept">Accept</p>
+    <p class="meaning small">The value is in the contract. Use it as written.</p>
+  </div>
+  <div class="row">
+    <p class="word label report">Report</p>
+    <p class="meaning small">The value breaks a rule. Report the violation. Do not change the value.</p>
+  </div>
+  <div class="row">
+    <p class="word label coerce">Coerce</p>
+    <p class="meaning small">The value has one safe fix. Apply the fix and record it in the audit log.</p>
+  </div>
+  <div class="row">
+    <p class="word label reject">Reject</p>
+    <p class="meaning small">The value is unsafe. Refuse it and do not apply a fix.</p>
+  </div>
+</section>
+</body>
+</html>

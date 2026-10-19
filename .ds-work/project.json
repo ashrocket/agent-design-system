@@ -1,0 +1,8 @@
+{
+ "n": "research",
+ "target": "design-system",
+ "mode": "new",
+ "brief": "Concept: an open, vendor-neutral standard (ADSF) whose core is a decision tree: accept, report, coerce, reject. Replaces the brief pages' generic navy/#2563eb look (\"## Replaces\"). Colours: white #ffffff (ground), ink #1a1d21, muted #59606b, rule #d9dce1, verdict-accept #1e6b47, verdict-report #1f5fad, verdict-coerce #8a5a00, verdict-reject #b42318. Type: \"Public Sans\" 400/700 (an open-source neutral face fits an open standard), \"Source Code Pro\" for code. Wordmark: \"ADSF\" in Public Sans 700; full name \"Agent Design System Format\". Cover pattern: a plus grid at one spacing step (precise, technical). Hero: \"ADSF\", the README one-sentence purpose, action \"Read the format\". Add a \"Verdict\" component: the four verdict states, each with a word (never colour alone).",
+ "ruling": "",
+ "defects": []
+}

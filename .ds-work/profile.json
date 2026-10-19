@@ -1,0 +1,45 @@
+{
+  "project": "research",
+  "what": "Agent Design System (ADSF): an open, vendor-neutral format and Python CLI (adsys) that lets agents read design rules and lets tools enforce them deterministically. Early alpha.",
+  "audience": "Developers and agent builders who write design-system contracts and enforcement tools.",
+  "landing_job": "No landing page exists. The README is the front page: it states the format goal and gives install and check commands.",
+  "surfaces": [
+    {"kind": "cli", "where": "src/agent_design_system/cli.py"},
+    {"kind": "docs-site", "where": "docs/*.html (two research briefs and one case study)"}
+  ],
+  "public_url": "",
+  "brand_family": "",
+  "logo_files": [],
+  "existing_ds": {
+    "paths": ["examples/aurora.design-system.json", "examples/rendered-react-source/tokens.css", "docs/design-system-research-brief-2026-09-29.html"],
+    "has_readme_brandbook": false,
+    "has_tokens": false,
+    "has_cover_or_specimen": false,
+    "has_hero_pattern": false,
+    "has_logo_rules": false,
+    "published_artifact": ""
+  },
+  "identity": {
+    "coherent": false,
+    "palette": [
+      {"role": "Brief body text (rendered brief)", "value": "#17263a", "cite": "docs/rendered-react-research-brief-2026-09-29.html:9"},
+      {"role": "Accent: callouts, flow labels, links", "value": "#2563eb", "cite": "docs/rendered-react-research-brief-2026-09-29.html:9"},
+      {"role": "Secondary text", "value": "#51627a", "cite": "docs/rendered-react-research-brief-2026-09-29.html:9"},
+      {"role": "Borders and dividers", "value": "#d8e2ef", "cite": "docs/rendered-react-research-brief-2026-09-29.html:9"},
+      {"role": "Header gradient start", "value": "#10243e", "cite": "docs/rendered-react-research-brief-2026-09-29.html:13"},
+      {"role": "Callout background", "value": "#edf4ff", "cite": "docs/rendered-react-research-brief-2026-09-29.html:9"},
+      {"role": "Red accent", "value": "#d62b45", "cite": "docs/rendered-react-research-brief-2026-09-29.html:9"},
+      {"role": "Body text (design-system brief, differs from #17263a)", "value": "#1e293b", "cite": "docs/design-system-research-brief-2026-09-29.html:8"}
+    ],
+    "type": [
+      {"role": "Headings (serif)", "family": "Georgia, \"Times New Roman\", serif", "cite": "docs/rendered-react-research-brief-2026-09-29.html:15"},
+      {"role": "Body (system sans)", "family": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif", "cite": "docs/rendered-react-research-brief-2026-09-29.html:11"},
+      {"role": "Headings (serif, second brief)", "family": "Georgia, \"Times New Roman\", serif", "cite": "docs/design-system-research-brief-2026-09-29.html:13"}
+    ],
+    "look": "Two HTML research briefs with a navy-and-blue card look and Georgia headings. The CLI has no visual identity."
+  },
+  "design_system_dir_conflict": "",
+  "classification": "new_needed",
+  "v2_case": "Both briefs use #2563eb and Georgia headings, but their ink differs (#17263a at docs/rendered-react-research-brief-2026-09-29.html:9 vs #1e293b at docs/design-system-research-brief-2026-09-29.html:8) and their eyebrow colour differs (#a9ceff at docs/rendered-react-research-brief-2026-09-29.html:14 vs #2357b7 at docs/design-system-research-brief-2026-09-29.html:12).",
+  "notes": "CLI and format spec, not a product with a landing page. The two briefs share blue and serif headings but no single palette. No logo, brand book or claude.ai artifact URL found by grep. Aurora tokens are sample fixtures, not project identity. Read-only; nothing else touched."
+}
